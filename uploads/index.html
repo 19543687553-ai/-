@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,maximum-scale=1">
+<title>凡人修仙</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<base target="_blank">
+</head>
+<body>
+
+<!-- 语言选择器 -->
+<div class="lang-selector">
+  <select id="langSelect" onchange="I18n.changeLanguage(this.value)">
+    <option value="zh-CN">简体中文</option>
+    <option value="zh-TW">繁體中文</option>
+    <option value="en">English</option>
+  </select>
+</div>
+
+<!-- 设备信息显示（调试用，上线时可隐藏） -->
+<div id="deviceInfo" class="device-info"></div>
+
+<!-- 自动登录提示 -->
+<div id="autoLoginHint" class="auto-login-hint"></div>
+
+<!-- 签到提示 -->
+<div id="signinHint" class="signin-hint hidden" onclick="SignInSystem.openModal()">
+  📅 今日未签到
+</div>
+
+<!-- 限制强制提示（全屏） -->
+<div id="restrictNotice" class="restrict-notice">
+  <div class="restrict-notice-icon">🚫</div>
+  <div class="restrict-notice-title">账号已被限制</div>
+  <div class="restrict-notice-content">
+    <div class="restrict-notice-text">您的账号因数据异常已被系统限制</div>
+    <div class="restrict-notice-text" id="restrictNoticeDays">限制时长：1天</div>
+    <div class="restrict-notice-time" id="restrictNoticeUntil">解除时间：2026-01-31 12:00:00</div>
+    <div class="restrict-notice-text" style="color: #ff6b6b; font-size: 14px; margin-top: 15px;">
+      限制期间所有游戏数据已重置<br>
+      请遵守游戏规则，保持数据正常
+    </div>
+    <button class="restrict-notice-btn" onclick="location.reload()">返回登录</button>
+  </div>
+</div>
+
+<div id="bannedBanner" class="banned-banner">
+  ⚠️ 账号因数据异常被限制，解除时间：<span id="banUntil"></span>
+</div>
+
+<!-- ==================== 离线收益弹窗 ==================== -->
+<div id="offlineRewardModal" class="offline-reward-modal">
+  <div class="offline-reward-window">
+    <div class="offline-reward-title">🌙 离线收益</div>
+    <div class="offline-reward-time" id="offlineTime">离线时长：2小时30分</div>
+    <div class="offline-reward-items">
+      <div class="offline-reward-item">
+        <span class="label">修为收益</span>
+        <span class="value" id="offlineExp">+5000</span>
+      </div>
+      <div class="offline-reward-item">
+        <span class="label">灵石收益</span>
+        <span class="value" id="offlineStones">+1000</span>
+      </div>
+      <div class="offline-reward-item">
+        <span class="label">寿元消耗</span>
+        <span class="value" id="offlineAge" style="color: #ff6b6b;">-5年</span>
+      </div>
+    </div>
+    <button class="offline-reward-btn" onclick="OfflineReward.claim()">领取收益</button>
+  </div>
+</div>
+
+<!-- ==================== 签到弹窗 ==================== -->
+<div id="signinModal" class="signin-modal">
+  <div class="signin-window">
+    <div class="signin-title">📅 每日签到</div>
+    <div class="signin-streak" id="signinStreak">连续签到 0 天</div>
+    <div class="signin-calendar" id="signinCalendar"></div>
+    <button class="signin-btn" id="signinBtn" onclick="SignInSystem.doSignIn()">立即签到</button>
+    <button class="signin-close" onclick="SignInSystem.closeModal()">关闭</button>
+  </div>
+</div>
+
+<!-- ==================== 数据导入导出弹窗 ==================== -->
+<div id="dataModal" class="data-modal">
+  <div class="data-window">
+    <div class="data-title">💾 数据管理</div>
+    
+    <div class="data-section">
+      <div class="data-section-title">📤 导出存档</div>
+      <div class="data-textarea" id="exportData" readonly style="min-height: 80px; overflow-wrap: break-word;">点击导出按钮生成存档代码...</div>
+      <div class="data-btn-group">
+        <button class="data-btn data-btn-export" onclick="DataManager.exportData()">导出</button>
+        <button class="data-btn data-btn-copy" onclick="DataManager.copyToClipboard()">复制</button>
+      </div>
+    </div>
+    
+    <div class="data-section">
+      <div class="data-section-title">📥 导入存档</div>
+      <textarea class="data-textarea" id="importData" placeholder="在此粘贴存档代码..."></textarea>
+      <div class="data-btn-group">
+        <button class="data-btn data-btn-import" onclick="DataManager.importData()">导入</button>
+        <button class="data-btn data-btn-close" onclick="DataManager.closeModal()">关闭</button>
+      </div>
+    </div>
+    
+    <div class="data-info">
+      <p>💡 <strong>使用说明：</strong></p>
+      <p>1. 在设备A点击"导出"并复制代码</p>
+      <p>2. 在设备B点击"导入"粘贴代码</p>
+      <p>3. 即可实现跨设备同步游戏进度</p>
+      <p style="margin-top: 8px; color: #ff6b6b;">⚠️ 导入会覆盖当前设备的所有数据，请谨慎操作！</p>
+    </div>
+  </div>
+</div>
+
+<!-- 新的登录容器 -->
+<div id="authBox">
+  <div class="auth-login-container">
+    <div class="auth-login-header">
+      <h1>🔐 凡人修仙传</h1>
+      <p>自建后端登录注册系统</p>
+    </div>
+
+    <div class="auth-login-tabs" id="authTabs">
+      <button class="auth-tab active" data-tab="login" onclick="APIAuth.switchTab('login')">登录</button>
+      <button class="auth-tab" data-tab="register" onclick="APIAuth.switchTab('register')">注册</button>
+    </div>
+
+    <div class="auth-form-container" id="authForms">
+      <!-- 登录表单 -->
+      <div class="auth-form-section active" id="loginSection">
+        <div id="loginMessage"></div>
+        <div class="auth-api-status" id="loginApiStatus">
+          登录API: 等待测试 | 
+          <a href="#" onclick="APIAuth.testLoginAPI(); return false;" style="color: #667eea;">测试登录接口</a>
+        </div>
+
+        <form id="loginForm">
+          <div class="auth-input-group">
+            <label>用户名 *</label>
+            <input type="text" id="loginUsername" placeholder="请输入用户名" required autocomplete="username">
+          </div>
+          <div class="auth-input-group">
+            <label>密码 *</label>
+            <input type="password" id="loginPassword" placeholder="请输入密码" required autocomplete="current-password">
+          </div>
+          <button type="submit" class="auth-btn" id="loginBtn">立即登录</button>
+        </form>
+      </div>
+
+      <!-- 注册表单 -->
+      <div class="auth-form-section" id="registerSection">
+        <div id="registerMessage"></div>
+        <div class="auth-api-status" id="regApiStatus">
+          注册API: 等待测试 | 
+          <a href="#" onclick="APIAuth.testRegAPI(); return false;" style="color: #667eea;">测试注册接口</a>
+        </div>
+
+        <form id="registerForm">
+          <div class="auth-input-group">
+            <label>用户名 *</label>
+            <input type="text" id="regUsername" placeholder="请输入用户名" required autocomplete="off">
+          </div>
+          <div class="auth-input-group">
+            <label>密码 *</label>
+            <input type="password" id="regPassword" placeholder="请输入密码" required>
+          </div>
+          <button type="submit" class="auth-btn" id="registerBtn">立即注册</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rootSelectModal" class="root-select-modal">
+  <div class="root-select-window">
+    <div class="root-select-title">☯ <span data-i18n="selectRoot">选择灵根品质</span></div>
+    <div class="root-list" id="rootList"></div>
+    <button class="dev-btn" onclick="Shop.closeRootSelect()" style="margin-top:15px" data-i18n="cancel">取消</button>
+  </div>
+</div>
+
+<div id="passwordModal" class="password-modal">
+  <div class="password-window">
+    <div class="password-title">🔐 <span data-i18n="devVerify">开发者验证</span></div>
+    <input id="devPassword" type="password" class="password-input" placeholder="请输入密码">
+    <button class="password-btn" onclick="DevTools.checkPassword()" data-i18n="verify">验证</button>
+    <button class="password-btn" style="background:rgba(255,0,0,.3); margin-top:10px" onclick="DevTools.closePassword()" data-i18n="cancel">取消</button>
+  </div>
+</div>
+
+<!-- ==================== 轮回系统弹窗 ==================== -->
+<div id="rebirthModal" class="rebirth-modal">
+  <div class="rebirth-window">
+    <div class="rebirth-title">🌀 <span data-i18n="rebirth">轮回转世</span></div>
+    <div class="rebirth-info">
+      <div><strong data-i18n="rebirthCount">当前轮回次数：</strong><span id="rebirthCount" style="color:#ffd700">0</span></div>
+      <div><strong data-i18n="attrBonus">属性加成：</strong><span id="rebirthBonus" class="attr-bonus">+0%</span></div>
+      <div id="nextRebirthReq" style="margin-top:10px; color:#ff6b6b; font-size:12px;"></div>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(148,0,211,.3);">
+        <strong data-i18n="rebirthEffect">轮回效果：</strong><br>
+        • <span data-i18n="rebirthEffect1">保留50%灵石和所有妖核</span><br>
+        • <span data-i18n="rebirthEffect2">保留传说及以上品质功法</span><br>
+        • <span data-i18n="rebirthEffect3">永久增强所有属性10%</span><br>
+        • <span data-i18n="rebirthEffect4">重置境界、修为、寿元</span><br>
+        • <span data-i18n="rebirthEffect5">最大属性加成上限500%</span>
+      </div>
+      <div style="margin-top:10px; color:#ff6b6b; font-size:12px;">
+        <strong data-i18n="rebirthCondition">开启条件：</strong><span id="rebirthCondition">达到大乘期（第8境界）</span>
+      </div>
+    </div>
+    <button class="rebirth-btn" id="rebirthBtn" onclick="RebirthSystem.confirmRebirth()" data-i18n="confirmRebirth">确认轮回</button>
+    <button class="rebirth-cancel" onclick="RebirthSystem.closeModal()" data-i18n="cancel">取消</button>
+  </div>
+</div>
+
+<!-- ==================== 道侣系统弹窗 ==================== -->
+<!-- 求婚请求弹窗 -->
+<div id="proposalModal" class="proposal-modal">
+  <div class="proposal-window">
+    <div class="proposal-title">💍 求婚请求</div>
+    <div class="proposal-text" id="proposalText"></div>
+    <div class="proposal-actions">
+      <button class="proposal-accept" onclick="DaoistCouple.acceptProposal()">💕 接受</button>
+      <button class="proposal-reject" onclick="DaoistCouple.rejectProposal()">💔 拒绝</button>
+    </div>
+  </div>
+</div>
+
+<!-- 道侣面板 -->
+<div id="partnerModal" class="partner-modal">
+  <div class="partner-window">
+    <div class="partner-header">
+      <div class="partner-back" onclick="DaoistCouple.closePartnerPanel()">←</div>
+      <div class="partner-title">💕 道侣</div>
+      <div style="width:40px"></div>
+    </div>
+    
+    <div class="partner-info-card">
+      <div class="partner-avatar">💑</div>
+      <div class="partner-name" id="partnerName">道侣</div>
+      <div class="partner-realm" id="partnerRealm">炼气期</div>
+      <div class="partner-power">战力: <span id="partnerPower">0</span></div>
+    </div>
+    
+    <div class="bond-section">
+      <div class="bond-header">
+        <span>羁绊值: <span id="partnerBond">0</span>/10000</span>
+        <span class="bond-level" id="partnerBondLevel">初识</span>
+      </div>
+      <div class="bond-bar-container">
+        <div class="bond-bar" id="bondBar" style="width:0%"></div>
+      </div>
+      <div id="bondHint" style="margin-top:8px;font-size:11px;text-align:center;"></div>
+    </div>
+    
+    <div class="partner-stats">
+      <div class="partner-stat-item">
+        <div class="partner-stat-value" id="partnerDays">0</div>
+        <div class="partner-stat-label">相伴天数</div>
+      </div>
+      <div class="partner-stat-item">
+        <div class="partner-stat-value" id="dualCount">0</div>
+        <div class="partner-stat-label">双修次数</div>
+      </div>
+    </div>
+    
+    <div class="partner-bonus">
+      <div class="partner-bonus-title">属性加成</div>
+      <div class="partner-bonus-content" id="partnerBonus">暂无加成</div>
+    </div>
+    
+    <div id="sadnessBuffStatus" style="display:none;"></div>
+    
+    <div class="partner-actions">
+      <button class="partner-btn dual" id="btnDualCultivation" onclick="DaoistCouple.dualCultivation()">💕 双修</button>
+      <button class="partner-btn flower" onclick="DaoistCouple.sendFlower()">🌹 送花</button>
+      <button class="partner-btn breakup" onclick="DaoistCouple.breakUp()">💔 解除</button>
+    </div>
+    
+    <div style="margin-top:20px;padding-top:15px;border-top:1px solid rgba(255,255,255,0.1);">
+      <div style="color:#ffd700;font-weight:bold;font-size:14px;margin-bottom:10px;text-align:center;">
+        🎁 羁绊道具商店
+      </div>
+      <div id="bondShopItems"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 数据管理后台 ==================== -->
+<div id="adminModal" class="admin-modal">
+  <div id="adminAuth" class="admin-auth">
+    <div class="admin-auth-box">
+      <div class="admin-auth-icon">⚙️</div>
+      <div class="admin-auth-title">🔒 <span data-i18n="adminPanel">数据管理后台</span></div>
+      <input type="password" id="adminPassword" class="password-input" placeholder="请输入管理密码" style="margin-bottom:15px;">
+      <button class="password-btn" onclick="AdminSystem.checkPassword()" style="margin-bottom:10px;" data-i18n="enterAdmin">进入管理</button>
+      <button class="password-btn" style="background:rgba(255,255,255,0.1)" onclick="AdminSystem.close()" data-i18n="cancel">取消</button>
+    </div>
+  </div>
+
+  <div class="admin-header">
+    <div class="admin-back" onclick="AdminSystem.close()">←</div>
+    <div class="admin-title">⚙️ <span data-i18n="gameDataCenter">游戏数据管理中心</span></div>
+    <div style="width:40px"></div>
+  </div>
+
+  <div class="admin-stats" id="adminStats">
+    <div class="stat-card">
+      <div class="stat-value" id="statTotal">0</div>
+      <div class="stat-label" data-i18n="totalPlayers">总玩家</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statRestricted" style="color:#ff6b6b">0</div>
+      <div class="stat-label" data-i18n="bannedPlayers">已封号</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statOnline" style="color:#00c853">0</div>
+      <div class="stat-label" data-i18n="onlinePlayers">在线</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statAbnormal" style="color:#ffa726">0</div>
+      <div class="stat-label" data-i18n="abnormalPlayers">异常</div>
+    </div>
+  </div>
+
+  <div class="category-tags">
+    <div class="category-tag active" onclick="AdminSystem.filter('all')" data-i18n="all">全部</div>
+    <div class="category-tag" onclick="AdminSystem.filter('normal')" data-i18n="normal">正常</div>
+    <div class="category-tag" onclick="AdminSystem.filter('abnormal')" data-i18n="abnormal">异常</div>
+    <div class="category-tag" onclick="AdminSystem.filter('restricted')" data-i18n="banned">已封号</div>
+    <div class="category-tag" onclick="AdminSystem.filter('online')" data-i18n="online">在线</div>
+  </div>
+
+  <div class="admin-search">
+    <input type="text" id="adminSearch" placeholder="搜索玩家名..." oninput="AdminSystem.search()">
+    <span class="admin-search-icon">🔍</span>
+  </div>
+
+  <div class="admin-content" id="adminContent">
+    <div class="player-list" id="playerList"></div>
+  </div>
+
+  <div class="action-panel" id="actionPanel">
+    <div class="action-panel-header">
+      <div class="action-panel-title" id="actionTarget">选择玩家</div>
+      <button class="action-close" onclick="AdminSystem.closeActionPanel()">×</button>
+    </div>
+
+    <div class="action-section">
+      <div class="action-label" data-i18n="accountCredentials">账号凭证</div>
+      <div style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#888; padding:10px; border-radius:8px; font-family:monospace; font-size:12px; word-break:break-all;" id="actionCredentials">
+        用户名: -<br>
+        密码: -
+      </div>
+    </div>
+
+    <div class="action-section">
+      <div class="action-label">🚫 <span data-i18n="banSettings">封号设置（天数）</span></div>
+      <div class="action-grid">
+        <button class="restrict-day-btn" onclick="AdminSystem.restrictPlayer(1)">1天</button>
+        <button class="restrict-day-btn" onclick="AdminSystem.restrictPlayer(3)">3天</button>
+        <button class="restrict-day-btn" onclick="AdminSystem.restrictPlayer(7)">7天</button>
+        <button class="restrict-day-btn" onclick="AdminSystem.restrictPlayer(30)">30天</button>
+        <button class="restrict-day-btn" onclick="AdminSystem.restrictPlayer(99999)" data-i18n="permanent">永久</button>
+      </div>
+      <button class="action-btn action-btn-warning" onclick="AdminSystem.unrestrictPlayer()" style="width:100%; margin-top:8px; background:linear-gradient(135deg,#11998e,#38ef7d);">✅ <span data-i18n="unban">解除封号</span></button>
+    </div>
+
+    <div class="action-section">
+      <div class="action-label">💰 <span data-i18n="dataAdjust">数据调整</span></div>
+      <div class="action-input-group">
+        <input type="number" id="adjustStones" class="action-input" placeholder="灵石数量">
+        <button class="action-btn action-btn-primary" onclick="AdminSystem.setStones()" data-i18n="set">设置</button>
+      </div>
+      <div class="action-input-group">
+        <input type="number" id="adjustStage" class="action-input" placeholder="境界(0-27)">
+        <button class="action-btn action-btn-primary" onclick="AdminSystem.setStage()" data-i18n="set">设置</button>
+      </div>
+      <div class="action-input-group">
+        <input type="number" id="adjustExp" class="action-input" placeholder="修为">
+        <button class="action-btn action-btn-primary" onclick="AdminSystem.setExp()" data-i18n="set">设置</button>
+      </div>
+      <div class="action-input-group">
+        <input type="number" id="adjustLife" class="action-input" placeholder="寿元">
+        <button class="action-btn action-btn-primary" onclick="AdminSystem.setLife()" data-i18n="set">设置</button>
+      </div>
+      <div class="action-input-group">
+        <input type="number" id="adjustPills" class="action-input" placeholder="丹药">
+        <button class="action-btn action-btn-primary" onclick="AdminSystem.setPills()" data-i18n="set">设置</button>
+      </div>
+      <div class="action-input-group">
+        <input type="number" id="adjustCores" class="action-input" placeholder="妖核">
+        <button class="action-btn action-btn-primary" onclick="AdminSystem.setCores()" data-i18n="set">设置</button>
+      </div>
+      <button class="action-btn action-btn-danger" onclick="AdminSystem.resetPlayer()" style="width:100%;" data-i18n="resetCharacter">⚠️ 重置角色</button>
+    </div>
+
+    <div class="action-section">
+      <div class="action-label">📊 <span data-i18n="currentData">当前数据</span></div>
+      <div id="playerDetailInfo" style="background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; font-size:12px; line-height:1.8; color:#aaa;">
+        点击玩家查看详情
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="adminDetailModal" class="admin-detail-modal">
+  <div class="admin-detail-header">
+    <div class="admin-back" onclick="AdminSystem.closeDetailModal()">←</div>
+    <div class="admin-detail-title" id="detailTitle">玩家详情</div>
+    <div style="width:40px"></div>
+  </div>
+  <div class="admin-detail-content" id="detailContent"></div>
+</div>
+
+<div id="editPlayerModal" class="edit-modal">
+  <div class="edit-window">
+    <div class="edit-title">✏️ <span data-i18n="editPlayer">编辑玩家数据</span></div>
+    <div id="editFields"></div>
+    <div class="edit-actions">
+      <button class="edit-btn edit-btn-save" onclick="AdminSystem.saveEdit()" data-i18n="save">保存</button>
+      <button class="edit-btn edit-btn-cancel" onclick="AdminSystem.closeEditModal()" data-i18n="cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="devModal" class="dev-modal">
+  <div class="dev-window" style="position:relative">
+    <div class="dev-close" onclick="DevTools.close()">×</div>
+    <div class="dev-title">⚡ <span data-i18n="devTools">开发者工具</span></div>
+    
+    <div class="dev-section">
+      <div class="dev-label">👥 <span data-i18n="selectPlayer">选择要调整的玩家（留空则调整自己）</span></div>
+      <div class="dev-player-list" id="devPlayerList"></div>
+      <input type="text" id="devTargetUser" class="dev-input" placeholder="点击上方玩家或手动输入" onchange="DevTools.onUsernameInput(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="background:rgba(255,215,0,.1)">
+    </div>
+    
+    <div class="dev-section">
+      <div class="dev-label">💰 <span data-i18n="stoneOps">灵石操作</span></div>
+      <input id="devStones" type="number" class="dev-input" placeholder="输入数量" min="0">
+      <div class="dev-grid">
+        <button class="dev-btn" onclick="DevTools.addStones()" data-i18n="add">增加</button>
+        <button class="dev-btn" style="background:linear-gradient(135deg,#ff416c,#ff6b6b)" onclick="DevTools.setStones()" data-i18n="set">设置</button>
+      </div>
+    </div>
+    
+    <div class="dev-section">
+      <div class="dev-label">📈 <span data-i18n="expOps">修为操作</span></div>
+      <input id="devExp" type="number" class="dev-input" placeholder="输入数量" min="0">
+      <div class="dev-grid">
+        <button class="dev-btn" onclick="DevTools.addExp()" data-i18n="add">增加</button>
+        <button class="dev-btn" style="background:linear-gradient(135deg,#ff416c,#ff6b6b)" onclick="DevTools.setExp()" data-i18n="set">设置</button>
+      </div>
+    </div>
+    
+    <div class="dev-section">
+      <div class="dev-label">❤️ <span data-i18n="lifeSet">寿元设置</span></div>
+      <input id="devLife" type="number" class="dev-input" placeholder="输入数量" min="0">
+      <button class="dev-btn" onclick="DevTools.setLife()" data-i18n="set">设置</button>
+    </div>
+    
+    <div class="dev-section">
+      <div class="dev-label">💊 <span data-i18n="pillSet">丹药设置</span></div>
+      <input id="devPills" type="number" class="dev-input" placeholder="输入数量" min="0">
+      <button class="dev-btn" onclick="DevTools.setPills()" data-i18n="set">设置</button>
+    </div>
+    
+    <div class="dev-section">
+      <div class="dev-label">🎯 <span data-i18n="stageSet">境界设置 (0-27)</span></div>
+      <input id="devStage" type="number" class="dev-input" placeholder="0=炼气, 27=宇宙" min="0" max="27">
+      <button class="dev-btn" onclick="DevTools.setStage()" data-i18n="setStage">设置境界</button>
+    </div>
+    
+    <div class="dev-section">
+      <div class="dev-label">⚡ <span data-i18n="quickOps">快捷操作</span></div>
+      <div class="dev-grid">
+        <button class="dev-btn" onclick="DevTools.maxAll()" data-i18n="maxAll">一键满级</button>
+        <button class="dev-btn" style="background:linear-gradient(135deg,#ff416c,#ff6b6b)" onclick="DevTools.resetAll()" data-i18n="resetChar">重置角色</button>
+      </div>
+    </div>
+    
+    <div class="dev-section">
+      <div class="dev-label">📢 <span data-i18n="broadcast">全服公告</span></div>
+      <input id="devBroadcast" type="text" class="dev-input" placeholder="输入公告内容" maxlength="100">
+      <button class="dev-btn" onclick="DevTools.sendBroadcast()" data-i18n="sendBroadcast">发送公告</button>
+    </div>
+    
+    <div class="dev-section data-verify-setting">
+      <div class="dev-label">🛡️ <span data-i18n="dataVerify">数据验证控制</span></div>
+      <label>
+        <span data-i18n="dataVerifyToggle">数据验证检测</span>
+        <div class="data-verify-toggle" id="dataVerifyToggle" onclick="DevTools.toggleDataVerify()"></div>
+      </label>
+      <button class="dev-btn" style="background:linear-gradient(135deg,#ff416c,#ff6b6b)" onclick="DevTools.restrictPlayerAction()" data-i18n="banPlayer">封号玩家</button>
+      <button class="dev-btn" style="background:linear-gradient(135deg,#11998e,#38ef7d)" onclick="DevTools.unrestrictPlayer()" data-i18n="unbanPlayer">解除封号</button>
+    </div>
+  </div>
+</div>
+
+<div id="battleModal" class="battle-modal">
+  <div class="battle-window">
+    <div class="battle-close" onclick="Game.closeBattleWindow()" title="收起窗口">×</div>
+    <div class="battle-title">⚔️ <span data-i18n="inBattle">战斗中</span></div>
+    <div class="battle-monster" id="battleMonster">遭遇妖兽</div>
+    <div class="battle-power-diff" id="battlePowerDiff">战力评估中...</div>
+    <div class="battle-timer" id="battleTimer">00:00</div>
+    <div class="battle-bar"><div class="battle-fill" id="battleFill"></div></div>
+    <div class="battle-hint" id="battleHint" data-i18n="battleHint">战斗期间无法执行其他操作...</div>
+  </div>
+</div>
+
+<div id="chatModal" class="chat-modal">
+  <div class="chat-header">
+    <div class="chat-back" onclick="FriendSystem.closeChat()">←</div>
+    <div class="chat-title" id="chatTitle">道友</div>
+    <div style="width:40px"></div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="chatInput" placeholder="输入消息..." onkeypress="if(event.key==='Enter')FriendSystem.sendMessage()" maxlength="200">
+    <button class="chat-send" onclick="FriendSystem.sendMessage()" data-i18n="send">发送</button>
+  </div>
+</div>
+
+<div id="giftModal" class="gift-modal">
+  <div class="gift-window">
+    <div class="gift-title">🎁 <span data-i18n="sendGift">赠送礼物</span></div>
+    <div class="gift-target"><span data-i18n="giftTo">赠送给：</span><span id="giftTargetName" style="color:#ffd700"></span></div>
+    <div class="gift-type">
+      <div class="gift-type-btn active" onclick="FriendSystem.selectGiftType('stones')" data-type="stones">💎 <span data-i18n="stones">灵石</span></div>
+      <div class="gift-type-btn" onclick="FriendSystem.selectGiftType('pills')" data-type="pills">💊 <span data-i18n="pills">丹药</span></div>
+    </div>
+    <input type="number" class="gift-amount" id="giftAmount" placeholder="输入数量" min="1" value="100" max="999999">
+    <div class="gift-actions">
+      <button class="gift-confirm" onclick="FriendSystem.confirmGift()" data-i18n="confirmGift">确认赠送</button>
+      <button class="gift-cancel" onclick="FriendSystem.closeGift()" data-i18n="cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="addFriendModal" class="add-friend-modal">
+  <div class="add-friend-window">
+    <div class="add-friend-title">👥 <span data-i18n="addFriend">添加好友</span></div>
+    <input type="text" class="add-friend-input" id="searchUser" placeholder="输入用户名搜索..." oninput="FriendSystem.searchUsers()" maxlength="10">
+    <div class="add-friend-list" id="searchResults"></div>
+    <button class="dev-btn" onclick="FriendSystem.closeAddFriend()" data-i18n="close">关闭</button>
+  </div>
+</div>
+
+<div id="challengeModal" class="challenge-modal">
+  <div class="challenge-window">
+    <div class="challenge-title">⚔️ <span data-i18n="sendChallenge">发起挑战</span></div>
+    <div class="challenge-vs">
+      <div class="challenge-player">
+        <div class="challenge-avatar" id="challengeMeAvatar" style="background:linear-gradient(135deg,#667eea,#764ba2)">我</div>
+        <div class="challenge-name" id="challengeMeName">我</div>
+        <div class="challenge-realm" id="challengeMeRealm">炼气期</div>
+        <div class="challenge-power" id="challengeMePower">战力: 0</div>
+      </div>
+      <div class="challenge-vs-text">VS</div>
+      <div class="challenge-player">
+        <div class="challenge-avatar" id="challengeEnemyAvatar" style="background:linear-gradient(135deg,#ff416c,#ff6b6b)">敌</div>
+        <div class="challenge-name" id="challengeEnemyName">对手</div>
+        <div class="challenge-realm" id="challengeEnemyRealm">炼气期</div>
+        <div class="challenge-power" id="challengeEnemyPower">战力: 0</div>
+      </div>
+    </div>
+    <div class="challenge-bet">
+      <div class="challenge-bet-title">💰 <span data-i18n="setBet">设置赌注（可选）</span></div>
+      <div class="challenge-bet-options">
+        <button class="challenge-bet-btn active" data-amount="0" onclick="PVPSystem.selectBet(0)" data-i18n="practice">切磋</button>
+        <button class="challenge-bet-btn" data-amount="100" onclick="PVPSystem.selectBet(100)">100灵石</button>
+        <button class="challenge-bet-btn" data-amount="1000" onclick="PVPSystem.selectBet(1000)">1000灵石</button>
+        <button class="challenge-bet-btn" data-amount="10000" onclick="PVPSystem.selectBet(10000)" data-i18n="tenKStones">1万灵石</button>
+      </div>
+    </div>
+    <div class="challenge-actions" id="challengeActions">
+      <button class="challenge-send" onclick="PVPSystem.sendChallenge()" data-i18n="sendChallengeBtn">发起挑战</button>
+      <button class="challenge-cancel" onclick="PVPSystem.closeChallenge()" data-i18n="cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="pvpBattleModal" class="pvp-battle-modal">
+  <div class="pvp-battle-window">
+    <div class="pvp-battle-title">⚔️ <span data-i18n="friendBattle">好友切磋</span></div>
+    <div class="pvp-battle-arena">
+      <div class="pvp-player me" id="pvpPlayerMe">
+        <div class="pvp-avatar me">我</div>
+        <div style="color:#fff; font-weight:bold; font-size:14px" id="pvpMeName">我</div>
+        <div class="realm-display" id="pvpMeRealm">炼气期</div>
+        <div class="power-display" id="pvpMePower">0</div>
+        <div class="pvp-hp-bar">
+          <div class="pvp-hp-fill" id="pvpMeHp" style="width:100%"></div>
+        </div>
+      </div>
+      <div class="pvp-vs-circle">VS</div>
+      <div class="pvp-player enemy" id="pvpPlayerEnemy">
+        <div class="pvp-avatar enemy">敌</div>
+        <div style="color:#fff; font-weight:bold; font-size:14px" id="pvpEnemyName">对手</div>
+        <div class="realm-display" id="pvpEnemyRealm">炼气期</div>
+        <div class="power-display" id="pvpEnemyPower">0</div>
+        <div class="pvp-hp-bar">
+          <div class="pvp-hp-fill" id="pvpEnemyHp" style="width:100%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="pvp-log" id="pvpBattleLog"></div>
+    <div id="pvpResultArea" style="display:none">
+      <div class="pvp-result" id="pvpResultText">胜利！</div>
+      <div class="pvp-reward" id="pvpRewardText">获得 500 灵石</div>
+      <button class="pvp-close" onclick="PVPSystem.closeBattle()" data-i18n="close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="challengePending" class="challenge-pending">
+  <div class="challenge-pending-title">⚔️ <span data-i18n="receivedChallenge">收到挑战！</span></div>
+  <div class="challenge-pending-text" id="challengePendingText">玩家 向你发起挑战</div>
+  <div class="challenge-pending-actions">
+    <button class="challenge-pending-accept" onclick="PVPSystem.acceptPendingChallenge()" data-i18n="accept">接受</button>
+    <button class="challenge-pending-reject" onclick="PVPSystem.rejectPendingChallenge()" data-i18n="reject">拒绝</button>
+  </div>
+</div>
+
+<div id="main">
+  <div class="bar">
+    <div class="bar-info">
+      <span style="cursor:pointer; text-decoration:underline" onclick="DevTools.openPassword()" title="点击打开开发者工具">👤 <span id="dispUser">道友</span></span>
+      <span>💰 <span id="dispStone">0</span></span>
+      <span>🌀 <span id="dispCores">0</span></span>
+      <span id="clickPowerDisplay" style="color:#5fa8ff; font-size:12px;"></span>
+      <span style="cursor:pointer; color:#ff416c; display:none" id="challengeNotice" onclick="PVPSystem.showChallengeList()">⚔️ <span id="challengeCount">0</span></span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center">
+      <button class="monitor-btn" onclick="SignInSystem.openModal()" title="每日签到">📅 签到</button>
+      <button class="data-btn" onclick="DataManager.openModal()" title="数据导入导出">💾 数据</button>
+      <button class="monitor-btn" onclick="AdminSystem.open()" title="数据管理后台">⚙️ 管理</button>
+      <div class="music-btn" id="musicBtn" title="音乐开关">🎵</div>
+      <button class="logout" onclick="Game.logout()" data-i18n="logout">退出</button>
+    </div>
+  </div>
+  <h1 data-i18n="gameTitleFull">凡人修仙传</h1>
+  <div id="status" class="status"></div>
+
+  <div class="scroll">
+    <div class="scroll-box" id="hBox"></div>
+  </div>
+
+  <div class="tab">
+    <button class="tab-btn active" data-page="log"   onclick="UI.switchTab('log')">📜 <span data-i18n="log">日志</span></button>
+    <button class="tab-btn"        data-page="skill" onclick="UI.switchTab('skill')">📚 <span data-i18n="skills">功法</span></button>
+    <button class="tab-btn"        data-page="shop"  onclick="UI.switchTab('shop')">🏪 <span data-i18n="shop">商店</span></button>
+    <button class="tab-btn"        data-page="bag"   onclick="UI.switchTab('bag')">🎒 <span data-i18n="bag">背包</span></button>
+    <button class="tab-btn"        data-page="alchemy" onclick="UI.switchTab('alchemy')">🍶 <span data-i18n="alchemy">炼药</span></button>
+    <button class="tab-btn"        data-page="task" onclick="UI.switchTab('task')">📋 <span data-i18n="tasks">任务</span></button>
+    <button class="tab-btn"        data-page="friend" onclick="UI.switchTab('friend')">👥 <span data-i18n="friends">好友</span><span id="friendBadge"></span></button>
+    <button class="tab-btn"        data-page="attr"  onclick="UI.switchTab('attr')">📊 <span data-i18n="attrs">属性</span></button>
+  </div>
+
+  <div class="content">
+    <div id="logPage"   class="page active"></div>
+    <div id="skillPage" class="page"></div>
+    <div id="shopPage"  class="page"></div>
+    <div id="bagPage"   class="page"></div>
+    <div id="alchemyPage" class="page"></div>
+    <div id="taskPage" class="page"></div>
+    <div id="friendPage" class="page"></div>
+    <div id="attrPage"  class="page"></div>
+  </div>
+</div>
+
+<!-- ==================== 宗门系统弹窗 ==================== -->
+<div id="clanModal" class="clan-modal">
+  <div class="clan-window">
+    <div class="clan-header">
+      <div class="clan-back" onclick="ClanSystem.closeClanPanel()">←</div>
+      <div class="clan-title">🏯 宗门</div>
+      <div style="width:40px"></div>
+    </div>
+    
+    <div id="clanContent">
+      <!-- 无宗门时显示列表 -->
+      <div id="clanListContainer" class="clan-list-container"></div>
+      <div id="clanDetailContainer" style="display:block">
+        <!-- 有宗门时显示详情 -->
+        <div class="clan-info-card">
+          <div class="clan-name" id="clanName">-</div>
+          <div class="clan-level">等级: Lv.<span id="clanLevel">1</span></div>
+          <div class="clan-master">宗主: <span id="clanMaster">-</span></div>
+          <div class="clan-members">成员: <span id="clanMembers">0</span></div>
+          <div class="clan-exp">宗门经验: <span id="clanExp">0</span></div>
+          <div class="clan-contribution">我的贡献: <span id="clanContribution">0</span></div>
+          <div class="clan-bonus" id="clanBonus">加成: -</div>
+        </div>
+        
+        <div class="clan-section">
+          <div class="clan-section-title">👥 宗门成员</div>
+          <div id="clanMemberList" class="clan-member-list"></div>
+        </div>
+        
+        <div class="clan-section">
+          <div class="clan-section-title">🙏 师徒系统</div>
+          <div id="clanMasterInfo" class="clan-master-info"></div>
+          <div class="clan-disciple-title">徒弟列表</div>
+          <div id="clanDiscipleList" class="clan-disciple-list"></div>
+          <div class="clan-actions">
+            <button class="clan-btn disciple" onclick="ClanSystem.takeDisciple(prompt('请输入徒弟名称:'))">收徒</button>
+            <button class="clan-btn master" onclick="ClanSystem.showFindMaster()">拜师</button>
+          </div>
+        </div>
+        
+        <div class="clan-section">
+          <div class="clan-section-title">📜 宗门任务</div>
+          <div id="clanTasksContainer" class="clan-tasks-container"></div>
+        </div>
+        
+        <div class="clan-section">
+          <div class="clan-section-title">💰 宗门捐献</div>
+          <div class="clan-donate">
+            <input type="number" id="clanDonateAmount" placeholder="捐献灵石数量" class="clan-donate-input">
+            <div class="clan-donate-btns">
+              <button class="clan-btn donate" onclick="ClanSystem.donate(parseInt(document.getElementById('clanDonateAmount').value) || 0)">捐献</button>
+              <button class="clan-btn donate" onclick="ClanSystem.donate(1000)">+1000</button>
+              <button class="clan-btn donate" onclick="ClanSystem.donate(10000)">+1万</button>
+              <button class="clan-btn donate" onclick="ClanSystem.donate(100000)">+10万</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="clan-actions-bottom">
+          <button class="clan-btn rename" onclick="ClanSystem.buyRenameCard()">📛 改名卡(50万灵石)</button>
+          <button class="clan-btn leave" onclick="ClanSystem.leaveClan()">🚪 退出宗门</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 网易云音乐播放器 ==================== -->
+<div id="neteaseMusicModal" class="netease-music-modal">
+    <div class="netease-music-window">
+        <div class="netease-music-header">
+            <div class="netease-music-back" onclick="NetEaseMusic.close()">←</div>
+            <div class="netease-music-title">🎵 网易云音乐</div>
+            <div class="netease-music-close" onclick="NetEaseMusic.close()">×</div>
+        </div>
+        
+        <div class="netease-music-search">
+            <input type="text" id="neteaseSearchInput" placeholder="搜索歌曲、歌手或专辑..." onkeypress="if(event.key==='Enter')NetEaseMusic.search()">
+            <button onclick="NetEaseMusic.search()">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+        
+        <div class="netease-music-results">
+            <div class="netease-results-title">
+                搜索结果
+                <span id="neteaseResultsCount">0 首歌曲</span>
+            </div>
+            <div id="neteaseResultsList">
+                <div class="netease-empty-state">
+                    <i class="fas fa-music"></i>
+                    <p>输入关键词搜索音乐</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="netease-player" id="neteasePlayer" style="display:none;">
+            <div class="netease-now-playing">
+                <div class="netease-cover" id="neteaseCover">
+                    <i class="fas fa-music"></i>
+                </div>
+                <div class="netease-info">
+                    <h3 id="neteaseTitle">未选择歌曲</h3>
+                    <p id="neteaseArtist">-</p>
+                </div>
+            </div>
+            
+            <div class="netease-controls">
+                <button class="netease-control" id="neteasePrevBtn">
+                    <i class="fas fa-step-backward"></i>
+                </button>
+                <button class="netease-play-pause" id="neteasePlayPauseBtn">
+                    <i class="fas fa-play" id="neteasePlayIcon"></i>
+                </button>
+                <button class="netease-control" id="neteaseNextBtn">
+                    <i class="fas fa-step-forward"></i>
+                </button>
+            </div>
+            
+            <div class="netease-progress">
+                <div class="netease-progress-bar">
+                    <div class="netease-progress-fill" id="neteaseProgress"></div>
+                </div>
+                <div class="netease-time">
+                    <span id="neteaseCurrentTime">0:00</span>
+                    <span id="neteaseDuration">0:00</span>
+                </div>
+            </div>
+            
+            <div class="netease-quality">
+                <div class="netease-quality-title">
+                    <i class="fas fa-volume-up"></i> 音质选择
+                </div>
+                <div class="netease-quality-btns">
+                    <button class="netease-quality-btn active" data-quality="hires">高清</button>
+                    <button class="netease-quality-btn" data-quality="lossless">无损</button>
+                    <button class="netease-quality-btn" data-quality="exhigh">极高</button>
+                    <button class="netease-quality-btn" data-quality="higher">较高</button>
+                    <button class="netease-quality-btn" data-quality="standard">标准</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="netease-mini-player" id="neteaseMiniPlayer" style="display:none;" onclick="NetEaseMusic.open()">
+            <div class="netease-mini-cover" id="miniCover">
+                <i class="fas fa-music"></i>
+            </div>
+            <div class="netease-mini-info">
+                <span id="miniTitle">未播放</span>
+                <span id="miniArtist">-</span>
+            </div>
+            <button class="netease-mini-play" id="miniPlayBtn" onclick="event.stopPropagation(); NetEaseMusic.togglePlayPause()">
+                <i class="fas fa-play" id="miniPlayIcon"></i>
+            </button>
+            <button class="netease-mini-close" onclick="event.stopPropagation(); NetEaseMusic.close()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<audio id="neteaseAudio" preload="metadata"></audio>
+
+<div class="music-hint" id="musicHint" style="position:fixed; bottom:60px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.8); color:#ffd700; padding:6px 12px; border-radius:20px; font-size:11px; display:none; white-space:nowrap"></div>
+<audio id="bgmCalm" loop></audio>
+<audio id="bgmBattle" loop></audio>
+<audio id="soundThunder" preload="auto"></audio>
+
+<script src="config.js"></script>
+<script src="utils.js"></script>
+<script src="i18n.js"></script>
+<script src="device.js"></script>
+<script src="offline-reward.js"></script>
+<script src="signin.js"></script>
+<script src="task.js"></script>
+<script src="data-manager.js"></script>
+<script src="data-monitor.js"></script>
+<script src="ai-patrol.js"></script>
+<script src="online-tracker.js"></script>
+<script src="rebirth.js"></script>
+<script src="data-security.js"></script>
+<script src="admin.js"></script>
+<script src="auth.js"></script>
+<script src="music.js"></script>
+<script src="friend.js"></script>
+<script src="pvp.js"></script>
+<script src="daoist-couple.js"></script>
+<script src="dev-tools.js"></script>
+<script src="main.js"></script>
+<script src="qingming-event.js"></script>
+<script src="clan.js"></script>
+</body>
+</html>
