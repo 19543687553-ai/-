@@ -21,7 +21,7 @@ const Auth = {
 
     // 后端API请求
     async apiRequest(action, params = {}) {
-        const baseUrl = 'https://skjh.2026027.xyz/api.php';
+        const baseUrl = '/api.php';
         const url = new URL(baseUrl);
         url.searchParams.append('action', action);
         for (const [key, value] of Object.entries(params)) {
