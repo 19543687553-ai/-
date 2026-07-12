@@ -113,7 +113,8 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
     <div class="toolbar">
       <label><input type="checkbox" id="selectAll"> 全选</label>
       <button class="btn-sm btn-sm-danger" id="batchDel">批量删除</button>
-      <button class="btn-sm btn-sm-primary" id="batchDl">批量下载</button>
+      <button class="btn-sm btn-sm-primary" id="batchDl">打包下载</button>
+      <button class="btn-sm btn-sm-primary" id="batchAllDl">全部打包</button>
       <button class="btn-sm btn-sm-primary" id="refreshBtn" style="margin-left:auto">刷新</button>
     </div>
     <div class="file-list" id="uploadedList">
@@ -151,7 +152,7 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
 <script>
 (function(){
 var el={};
-['dropZone','fileInput','fileList','uploadBtn','clearBtn','createBtn','fileName','fileType','codeEditor','toast','uploadedList','refreshBtn','selectAll','batchDel','batchDl','fileCount'].forEach(function(id){
+['dropZone','fileInput','fileList','uploadBtn','clearBtn','createBtn','fileName','fileType','codeEditor','toast','uploadedList','refreshBtn','selectAll','batchDel','batchDl','batchAllDl','fileCount'].forEach(function(id){
   el[id]=document.getElementById(id);
 });
 
@@ -281,12 +282,20 @@ el.batchDel.addEventListener('click',function(){
 el.batchDl.addEventListener('click',function(){
   var checked=getChecked();
   if(!checked.length){showToast('请先勾选文件','error');return;}
-  checked.forEach(function(name){
+  var url='/batch-download?names='+encodeURIComponent(checked.join(','));
+  var a=document.createElement('a');
+  a.href=url;a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);
+  showToast('开始打包下载 '+checked.length+' 个文件','success');
+});
+
+el.batchAllDl.addEventListener('click',function(){
+  fetch('/files').then(function(r){return r.json();}).then(function(d){
+    if(!d.files||!d.files.length){showToast('没有可下载的文件','error');return;}
+    var all=d.files.map(function(f){return f.name;}).join(',');
     var a=document.createElement('a');
-    a.href='/download?name='+encodeURIComponent(name);
-    a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+    a.href='/batch-download?names='+encodeURIComponent(all);a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);
+    showToast('开始打包下载全部 '+d.files.length+' 个文件','success');
   });
-  showToast('开始下载 '+checked.length+' 个文件','success');
 });
 
 function updateEditor(){

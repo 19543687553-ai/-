@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, json, cgi, hashlib, time, base64, binascii
+import os, json, cgi, hashlib, time, base64, binascii, zipfile, io
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -153,6 +153,33 @@ class UploadHandler(SimpleHTTPRequestHandler):
             self.send_json({'files': list_files()})
         elif path == '/api.php':
             self.send_json(handle_api(self, qs))
+        elif path == '/batch-download':
+            names = qs.get('names', [''])[0]
+            if not names:
+                self.send_json({'success': False, 'error': '请选择文件'}, 400)
+                return
+            names = [safe_filename(n.strip()) for n in names.split(',') if n.strip()]
+            if not names:
+                self.send_json({'success': False, 'error': '请选择文件'}, 400)
+                return
+
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for n in names:
+                    fp = os.path.join(UPLOAD_DIR, n)
+                    if os.path.isfile(fp):
+                        zf.write(fp, n)
+
+            buf.seek(0)
+            data = buf.getvalue()
+            zip_name = 'files_{}.zip'.format(time.strftime('%Y%m%d_%H%M%S'))
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/zip')
+            self.send_header('Content-Disposition', 'attachment; filename="{}"'.format(zip_name))
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(data)
         elif path == '/download':
             fname = qs.get('name', [None])[0]
             if not fname or fname == 'undefined':
