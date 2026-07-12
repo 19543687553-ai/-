@@ -274,6 +274,24 @@ class UploadHandler(SimpleHTTPRequestHandler):
                 else:
                     missing.append(name)
             self.send_json({'success': True, 'deleted': deleted, 'missing': missing})
+        elif path == '/rename':
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode('utf-8'))
+            old = safe_filename(data.get('old', ''))
+            new = safe_filename(data.get('new', ''))
+            if not old or not new:
+                self.send_json({'success': False, 'error': '参数不完整'}, 400)
+                return
+            oldpath = os.path.join(UPLOAD_DIR, old)
+            newpath = os.path.join(UPLOAD_DIR, new)
+            if not os.path.isfile(oldpath):
+                self.send_json({'success': False, 'error': '文件不存在'}, 404)
+                return
+            if os.path.exists(newpath):
+                self.send_json({'success': False, 'error': '目标文件名已存在'}, 400)
+                return
+            os.rename(oldpath, newpath)
+            self.send_json({'success': True, 'filename': new})
         else:
             self.send_json({'success': False, 'error': 'Not Found'}, 404)
 

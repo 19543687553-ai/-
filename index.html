@@ -2,374 +2,342 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,maximum-scale=1">
 <title>文件管理</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0f0f1a;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
-.container{max-width:720px;margin:0 auto;padding:40px 20px}
-h1{text-align:center;font-size:26px;margin-bottom:24px;color:#7c8aff}
+body{background:#0d0d18;color:#d0d0d0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+.container{max-width:760px;margin:0 auto;padding:24px 16px}
+h1{text-align:center;font-size:22px;margin-bottom:20px;color:#7c8aff;font-weight:700}
 
-.tabs{display:flex;background:#151528;border-radius:10px;padding:4px;margin-bottom:24px}
-.tab{flex:1;text-align:center;padding:10px;border-radius:8px;cursor:pointer;color:#666;font-size:14px;font-weight:500;transition:all .2s;user-select:none}
+.tabs{display:flex;background:#141428;border-radius:10px;padding:3px;margin-bottom:20px}
+.tab{flex:1;text-align:center;padding:10px;border-radius:8px;cursor:pointer;color:#666;font-size:13px;font-weight:500;transition:all .2s;user-select:none}
 .tab:hover{color:#aaa}
-.tab.active{background:#2a2a4a;color:#7c8aff}
+.tab.active{background:#252540;color:#7c8aff;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 
 .panel{display:none}
 .panel.active{display:block}
 
-.drop-zone{border:2px dashed #2a2a4a;border-radius:16px;padding:60px 20px;text-align:center;background:#151528;cursor:pointer;margin-bottom:24px;transition:all .25s}
-.drop-zone.drag-over{border-color:#7c8aff;background:#1a1a3a;box-shadow:0 0 24px rgba(124,138,255,.15)}
-.drop-zone-icon{font-size:48px;margin-bottom:12px;opacity:.6}
-.drop-zone p{color:#888;font-size:15px}
+.drop-zone{border:2px dashed #222;border-radius:14px;padding:50px 16px;text-align:center;background:#141428;cursor:pointer;margin-bottom:18px;transition:all .25s}
+.drop-zone.drag-over{border-color:#7c8aff;background:#1a1a36;box-shadow:0 0 20px rgba(124,138,255,.12)}
+.drop-zone-icon{font-size:40px;margin-bottom:10px;opacity:.5}
+.drop-zone p{color:#777;font-size:14px}
 .drop-zone .hl{color:#7c8aff;font-weight:600}
 .file-input{display:none}
 
-.file-list{background:#151528;border-radius:12px;overflow:hidden;margin-bottom:20px}
-.file-item{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #1e1e36}
+.toolbar{display:flex;align-items:center;gap:6px;padding:10px 12px;background:#141428;border-radius:10px;margin-bottom:10px;flex-wrap:wrap}
+.toolbar-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%}
+.toolbar-row+.toolbar-row{margin-top:6px}
+.search-box{flex:1;min-width:120px;position:relative}
+.search-box input{padding:7px 10px;font-size:13px;width:100%;background:#1a1a30;border:1px solid #2a2a4a;border-radius:7px;color:#d0d0d0;outline:none}
+.search-box input:focus{border-color:#7c8aff}
+.search-box input::placeholder{color:#555}
+.sort-select{padding:7px 24px 7px 10px;font-size:12px;background:#1a1a30;border:1px solid #2a2a4a;border-radius:7px;color:#999;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23777' d='M5 7L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.sort-select:focus{border-color:#7c8aff}
+
+.file-list{background:#141428;border-radius:10px;overflow:hidden;margin-bottom:16px}
+.file-item{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid #1a1a30;gap:10px;transition:background .15s}
 .file-item:last-child{border-bottom:none}
-.file-item:hover{background:#1a1a34}
-.file-check{width:18px;height:18px;margin-right:12px;flex-shrink:0;accent-color:#536dfe;cursor:pointer}
-.file-icon{margin-right:12px;flex-shrink:0}
-.file-info{flex:1;min-width:0}
-.file-name{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file-meta{font-size:12px;color:#666;margin-top:2px}
-.file-status{font-size:13px;flex-shrink:0;margin-left:10px}
-.file-status.success{color:#4caf50}
-.file-status.error{color:#ff5252}
-.file-status.pending{color:#888}
-.file-status.uploading{color:#ffa726}
-.progress-bar{height:3px;background:#2a2a4a;border-radius:2px;margin-top:4px;overflow:hidden}
-.progress-fill{height:100%;background:linear-gradient(90deg,#7c8aff,#536dfe);border-radius:2px;transition:width .2s;width:0}
-.empty-state{padding:50px 20px;text-align:center;color:#555;font-size:14px}
+.file-item:hover{background:#181834}
+.file-check{width:17px;height:17px;flex-shrink:0;accent-color:#536dfe;cursor:pointer}
+.file-icon{flex-shrink:0}
+.file-main{flex:1;min-width:0}
+.file-name-row{display:flex;align-items:center;gap:6px}
+.file-name-text{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-meta{font-size:11px;color:#555;margin-top:3px;display:flex;gap:12px}
+.file-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.btn-icon{width:28px;height:28px;border:none;border-radius:6px;font-size:13px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;background:transparent;color:#777;line-height:1}
+.btn-icon:hover{background:#252540;color:#ddd}
+.btn-icon.danger:hover{background:#351a1a;color:#ff5252}
+.btn-icon.primary:hover{background:#1a2a4a;color:#7c8aff}
+.dl-link{text-decoration:none;color:inherit}
 
-.del-btn{width:24px;height:24px;border:none;border-radius:50%;background:#3a1a1a;color:#ff5252;font-size:14px;line-height:24px;text-align:center;cursor:pointer;transition:all .2s;padding:0;flex-shrink:0;margin-left:4px}
-.del-btn:hover{background:#ff5252;color:#fff}
-.dl-btn{width:24px;height:24px;border:none;border-radius:50%;background:#1a2a3a;color:#7c8aff;font-size:13px;line-height:24px;text-align:center;cursor:pointer;transition:all .2s;padding:0;flex-shrink:0;margin-left:4px;text-decoration:none}
-.dl-btn:hover{background:#7c8aff;color:#fff}
+.empty-state{padding:40px 16px;text-align:center;color:#444;font-size:13px}
+.empty-state p{margin-top:6px}
 
-.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.toolbar label{font-size:13px;color:#888;display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none}
-.toolbar label input{margin:0}
-.btn-sm{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
-.btn-sm-danger{background:#3a1a1a;color:#ff5252}
-.btn-sm-danger:hover{background:#c62828;color:#fff}
-.btn-sm-primary{background:#1a2a4a;color:#7c8aff}
-.btn-sm-primary:hover{background:#536dfe;color:#fff}
-.section-title{font-size:14px;color:#888;margin:28px 0 2px 4px;display:flex;align-items:center;gap:8px}
-.section-title .count{font-size:12px;color:#555}
+.pending-status{font-size:11px;flex-shrink:0;min-width:40px;text-align:right}
+.pending-status.success{color:#4caf50}
+.pending-status.error{color:#ff5252}
+.pending-status.uploading{color:#ffa726}
+.progress-bar{height:2px;background:#1a1a30;border-radius:1px;margin-top:3px;overflow:hidden;width:100%}
+.progress-fill{height:100%;background:#7c8aff;border-radius:1px;transition:width .2s;width:0}
 
-.form-group{margin-bottom:16px}
-.form-label{display:block;font-size:13px;color:#888;margin-bottom:6px}
-.form-row{display:flex;gap:12px}
-.form-row .form-group{flex:1}
+.stats{display:flex;justify-content:space-between;align-items:center;padding:0 4px;margin-bottom:8px}
+.stats-text{font-size:12px;color:#555}
+.stats-actions{display:flex;gap:6px}
+.stats-actions label{display:flex;align-items:center;gap:4px;font-size:12px;color:#666;cursor:pointer;user-select:none}
+.stats-actions label input{margin:0;accent-color:#536dfe}
 
-input[type=text],textarea,select{width:100%;background:#151528;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;color:#e0e0e0;font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
-input:focus,textarea:focus,select:focus{border-color:#7c8aff}
-textarea{resize:vertical;min-height:260px;font-family:'SF Mono','Fira Code',Consolas,monospace;font-size:13px;line-height:1.6;tab-size:2}
-select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-
-.btn{padding:12px 24px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center}
+.btn{padding:11px 20px;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center}
 .btn-block{display:block;width:100%}
 .btn-primary{background:#536dfe;color:#fff}
-.btn-primary:hover{background:#7c8aff}
-.btn-primary:disabled{background:#2a2a4a;color:#555;cursor:not-allowed}
-.btn-gray{background:#444;color:#ccc}
-.btn-gray:hover{background:#555}
+.btn-primary:hover{background:#6b82ff}
+.btn-primary:disabled{background:#1a1a30;color:#444;cursor:not-allowed}
+.btn-gray{background:#222;color:#999}
+.btn-gray:hover{background:#2a2a3a;color:#ccc}
 .mt8{margin-top:8px}
 
-.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 28px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
-.toast.success{background:#2e7d32}
-.toast.error{background:#c62828}
-.info-bar{text-align:center;color:#555;font-size:12px;margin-top:30px}
+.toast.success{background:#1b5e20}
+.toast.error{background:#b71c1c}
+
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:12px;color:#777;margin-bottom:5px}
+.form-row{display:flex;gap:10px}
+.form-row .form-group{flex:1}
+
+input[type=text],textarea,select{width:100%;background:#141428;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;color:#d0d0d0;font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
+input:focus,textarea:focus,select:focus{border-color:#7c8aff}
+textarea{resize:vertical;min-height:240px;font-family:'SF Mono','Fira Code',Consolas,monospace;font-size:13px;line-height:1.6;tab-size:2}
+select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath fill='%23777' d='M6 8L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+
+.info-bar{text-align:center;color:#444;font-size:11px;margin-top:24px}
+
+.rename-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:200;display:none}
+.rename-overlay.show{display:flex}
+.rename-box{background:#1a1a30;border:1px solid #2a2a4a;border-radius:12px;padding:24px;width:320px;max-width:90vw}
+.rename-box h3{color:#ddd;font-size:15px;margin-bottom:16px}
+.rename-box .btn-row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+.rename-box .btn-row .btn{padding:8px 18px;font-size:13px}
+
+@media(max-width:480px){
+  .container{padding:16px 10px}
+  .file-item{padding:10px 10px;gap:8px}
+  .file-actions{gap:0}
+  .btn-icon{width:26px;height:26px}
+  .toolbar{padding:8px 10px}
+}
 </style>
 </head>
 <body>
-
 <div class="container">
   <h1>文件管理</h1>
-
   <div class="tabs">
-    <div class="tab active" data-panel="upload">上传文件</div>
+    <div class="tab active" data-panel="upload">上传管理</div>
     <div class="tab" data-panel="create">新建文件</div>
   </div>
 
   <div class="panel active" id="panel-upload">
     <div class="drop-zone" id="dropZone">
-      <div class="drop-zone-icon">&#x1F4C1;</div>
-      <p>拖放文件到此处，或 <span class="hl">点击选择文件</span></p>
+      <div class="drop-zone-icon">&#x1F4C2;</div>
+      <p>拖放文件 / <span class="hl">点击选择</span></p>
     </div>
     <input type="file" class="file-input" id="fileInput" multiple>
-    <div class="file-list" id="fileList">
-      <div class="empty-state">暂无待上传文件</div>
-    </div>
+
+    <div class="file-list" id="fileList"><div class="empty-state">暂无待上传</div></div>
     <button class="btn btn-block btn-primary" id="uploadBtn" disabled>上传文件</button>
     <button class="btn btn-block btn-gray mt8" id="clearBtn" disabled>清空列表</button>
 
-    <div class="section-title">
-      已上传文件 <span class="count" id="fileCount"></span>
+    <div class="stats" style="margin-top:20px">
+      <span class="stats-text" id="statsText"></span>
+      <div class="stats-actions">
+        <label><input type="checkbox" id="selectAll"> 全选</label>
+        <select class="sort-select" id="sortBy">
+          <option value="name-asc">名称 A-Z</option>
+          <option value="name-desc">名称 Z-A</option>
+          <option value="size-desc">大小 大-小</option>
+          <option value="size-asc">大小 小-大</option>
+          <option value="time-desc">最近上传</option>
+          <option value="time-asc">最早上传</option>
+        </select>
+      </div>
     </div>
     <div class="toolbar">
-      <label><input type="checkbox" id="selectAll"> 全选</label>
-      <button class="btn-sm btn-sm-danger" id="batchDel">批量删除</button>
-      <button class="btn-sm btn-sm-primary" id="batchDl">打包下载</button>
-      <button class="btn-sm btn-sm-primary" id="batchAllDl">全部打包</button>
-      <button class="btn-sm btn-sm-primary" id="refreshBtn" style="margin-left:auto">刷新</button>
+      <div class="toolbar-row">
+        <div class="search-box"><input type="text" id="searchInput" placeholder="搜索文件名..."></div>
+        <button class="btn-icon" id="refreshBtn" title="刷新">&#x21bb;</button>
+      </div>
+      <div class="toolbar-row">
+        <button class="btn btn-primary btn-block" style="flex:1;padding:8px 12px;font-size:12px" id="batchDl">打包下载选中</button>
+        <button class="btn btn-gray btn-block" style="flex:1;padding:8px 12px;font-size:12px" id="batchAllDl">打包全部</button>
+        <button class="btn btn-gray btn-block" style="flex:1;padding:8px 12px;font-size:12px" id="batchDel">删除选中</button>
+      </div>
     </div>
-    <div class="file-list" id="uploadedList">
-      <div class="empty-state">加载中...</div>
-    </div>
+    <div class="file-list" id="uploadedList"><div class="empty-state">加载中...</div></div>
   </div>
 
   <div class="panel" id="panel-create">
     <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">文件名</label>
-        <input type="text" id="fileName" placeholder="my-script.js">
-      </div>
-      <div class="form-group">
-        <label class="form-label">格式</label>
+      <div class="form-group"><label class="form-label">文件名</label><input type="text" id="fileName" placeholder="my-script.js"></div>
+      <div class="form-group"><label class="form-label">格式</label>
         <select id="fileType">
-          <option value="js">JavaScript (.js)</option>
-          <option value="html">HTML (.html)</option>
-          <option value="css">CSS (.css)</option>
-          <option value="php">PHP (.php)</option>
+          <option value="js">JS</option><option value="html">HTML</option><option value="css">CSS</option><option value="php">PHP</option>
         </select>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">代码内容</label>
-      <textarea id="codeEditor" spellcheck="false"></textarea>
-    </div>
+    <div class="form-group"><label class="form-label">代码</label><textarea id="codeEditor" spellcheck="false"></textarea></div>
     <button class="btn btn-block btn-primary" id="createBtn">创建文件</button>
   </div>
-
-  <div class="info-bar">文件保存到仓库 uploads/ 目录，上传后通知我推送到 GitHub</div>
+  <div class="info-bar">保存到仓库 uploads/，上传后通知推送 GitHub</div>
 </div>
+
 <div class="toast" id="toast"></div>
+<div class="rename-overlay" id="renameOverlay">
+  <div class="rename-box">
+    <h3>重命名</h3>
+    <input type="text" id="renameInput" style="width:100%">
+    <div class="btn-row">
+      <button class="btn btn-gray" onclick="M.renameCancel()">取消</button>
+      <button class="btn btn-primary" id="renameConfirm">确定</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function(){
-var el={};
-['dropZone','fileInput','fileList','uploadBtn','clearBtn','createBtn','fileName','fileType','codeEditor','toast','uploadedList','refreshBtn','selectAll','batchDel','batchDl','batchAllDl','fileCount'].forEach(function(id){
-  el[id]=document.getElementById(id);
+var E={};
+'volist|dropZone|fileInput|fileList|uploadBtn|clearBtn|createBtn|fileName|fileType|codeEditor|toast|uploadedList|refreshBtn|selectAll|batchDel|batchDl|batchAllDl|searchInput|sortBy|statsText|renameOverlay|renameInput|renameConfirm'.split('|').forEach(function(k){
+  var el=document.getElementById(k);if(el)E[k]=el;
 });
 
-var MAX_FSIZE=100*1024*1024;
-var pendingFiles=[];
-var uploadedNames={};
-var templates={
-  js:'console.log("Hello World");\n',
-  html:'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n  <meta charset="UTF-8">\n  <title>Document</title>\n</head>\n<body>\n  <h1>Hello</h1>\n</body>\n</html>\n',
-  css:'body {\n  margin: 0;\n  font-family: sans-serif;\n}\n',
-  php:'<?php\necho "Hello World";\n'
-};
+var allFiles=[],pendingFiles=[],uploadedNames={},currentRename='';
+var MAX_F=100*1024*1024;
+var T={js:'console.log("Hello");\n',html:'<!DOCTYPE html>\n<html>\n<head><meta charset="UTF-8"><title>Doc</title></head>\n<body><h1>Hello</h1></body>\n</html>\n',css:'body{margin:0;font-family:sans-serif;}\n',php:'<?php\necho "Hello";\n'};
 
-function showToast(msg,type){
-  el.toast.textContent=msg;
-  el.toast.className='toast show '+type;
-  setTimeout(function(){el.toast.classList.remove('show');},2500);
+function TST(msg,t){E.toast.textContent=msg;E.toast.className='toast show '+t;setTimeout(function(){E.toast.classList.remove('show');},2200);}
+function FS(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';if(b<1073741824)return(b/1048576).toFixed(1)+' MB';return(b/1073741824).toFixed(2)+' GB';}
+function GI(n){var e=n.split('.').pop().toLowerCase();var a=/^(mp3|wav|flac|ogg|aac|m4a)$/.test(e);var v=/^(mp4|mov|avi|mkv|webm)$/.test(e);var i=/^(jpg|jpeg|png|gif|svg|webp)$/.test(e);var m={js:'JS',ts:'TS',html:'HT',css:'CS',php:'PH',json:'JN',md:'MD',py:'PY',mp3:'MP',wav:'WA',flac:'FL',ogg:'OG'};var bg=a?'#e65100':v?'#ad1457':i?'#2e7d32':'#3949ab';var lb=(m[e]||e.substring(0,2).toUpperCase()).substring(0,2);return'<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;font-size:10px;font-weight:700;background:'+bg+';color:#fff;flex-shrink:0">'+lb+'</span>';}
+
+function getChecked(){
+  return [].map.call(E.uploadedList.querySelectorAll('.file-check:checked'),function(c){return c.value;});
 }
 
-function formatSize(b){
-  if(b<1024)return b+' B';
-  if(b<1048576)return (b/1024).toFixed(1)+' KB';
-  return (b/1048576).toFixed(1)+' MB';
+function sortFiles(){
+  var s=E.sortBy.value;
+  if(s==='name-asc')allFiles.sort(function(a,b){return a.name.localeCompare(b.name);});
+  else if(s==='name-desc')allFiles.sort(function(a,b){return b.name.localeCompare(a.name);});
+  else if(s==='size-desc')allFiles.sort(function(a,b){return b.size-a.size;});
+  else if(s==='size-asc')allFiles.sort(function(a,b){return a.size-b.size;});
+  else if(s==='time-desc')allFiles.sort(function(a,b){return b.mtime-a.mtime;});
+  else if(s==='time-asc')allFiles.sort(function(a,b){return a.mtime-b.mtime;});
+  renderUploaded();
 }
 
-function getIcon(n){
-  var ext=n.split('.').pop().toLowerCase();
-  var isAudio=/^(mp3|wav|flac|ogg|aac|m4a|wma)$/.test(ext);
-  var isVideo=/^(mp4|mov|avi|mkv|webm)$/.test(ext);
-  var isImg=/^(jpg|jpeg|png|gif|svg|webp|bmp|ico)$/.test(ext);
-  var m={js:'JS',ts:'TS',html:'HT',css:'CS',php:'PH',json:'JN',md:'MD',py:'PY',mp3:'MP',wav:'WA',flac:'FL',ogg:'OG'};
-  var bg=isAudio?'#ff9800':isVideo?'#e91e63':isImg?'#4caf50':'#536dfe';
-  var label=(m[ext]||ext.substring(0,2).toUpperCase()).substring(0,2);
-  return '<span style="display:inline-block;width:30px;height:30px;line-height:30px;text-align:center;border-radius:6px;font-size:11px;font-weight:700;background:'+bg+';color:#fff">'+label+'</span>';
+function renderUploaded(){
+  uploadedNames={};
+  var q=(E.searchInput.value||'').toLowerCase();
+  var filtered=q?allFiles.filter(function(f){return f.name.toLowerCase().indexOf(q)!==-1;}):allFiles;
+  var total=0;allFiles.forEach(function(f){total+=f.size;});
+
+  E.statsText.textContent=allFiles.length+' 个文件 / '+FS(total);
+  if(filtered.length!==allFiles.length)E.statsText.textContent+=' (筛选 '+filtered.length+' 个)';
+
+  if(!filtered.length){E.uploadedList.innerHTML='<div class="empty-state"><p>'+((E.searchInput.value)?'无匹配文件':'暂无文件')+'</p></div>';E.selectAll.checked=false;return;}
+  E.selectAll.checked=false;
+
+  var h='';
+  filtered.forEach(function(f){
+    uploadedNames[f.name]=true;
+    h+='<div class="file-item"><input type="checkbox" class="file-check" value="'+f.name+'"><div class="file-icon">'+GI(f.name)+'</div><div class="file-main"><div class="file-name-row"><span class="file-name-text">'+f.name+'</span></div><div class="file-meta"><span>'+FS(f.size)+'</span><span>'+new Date(f.mtime*1000).toLocaleString('zh-CN')+'</span></div></div><div class="file-actions"><a class="btn-icon dl-link primary" href="/download?name='+encodeURIComponent(f.name)+'" download title="下载">&#x2193;</a><button class="btn-icon" data-rename="'+f.name+'" title="重命名">&#9998;</button><button class="btn-icon danger" data-del="'+f.name+'" title="删除">&times;</button></div></div>';
+  });
+  E.uploadedList.innerHTML=h;
+
+  E.uploadedList.querySelectorAll('[data-del]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();M.delFile(this.dataset.del);});});
+  E.uploadedList.querySelectorAll('[data-rename]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();M.showRename(this.dataset.rename);});});
 }
 
-function renderList(){
-  if(pendingFiles.length===0){
-    el.fileList.innerHTML='<div class="empty-state">暂无待上传文件</div>';
-    el.uploadBtn.disabled=true;el.clearBtn.disabled=true;
-    return;
-  }
-  el.uploadBtn.disabled=false;el.clearBtn.disabled=false;
-  var html='';
+function loadUploaded(){
+  fetch('/files').then(function(r){return r.json();}).then(function(d){allFiles=d.files||[];sortFiles();}).catch(function(){E.uploadedList.innerHTML='<div class="empty-state">加载失败</div>';});
+}
+
+E.searchInput.addEventListener('input',renderUploaded);
+E.sortBy.addEventListener('change',function(){sortFiles();});
+E.selectAll.addEventListener('change',function(){var c=this.checked;E.uploadedList.querySelectorAll('.file-check').forEach(function(cb){cb.checked=c;});});
+
+E.batchDel.addEventListener('click',function(){var c=getChecked();if(!c.length)return TST('请先勾选文件','error');if(!confirm('删除 '+c.length+' 个文件?'))return;fetch('/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filenames:c})}).then(function(r){return r.json();}).then(function(d){TST('已删除 '+d.deleted.length+' 个','success');loadUploaded();}).catch(function(){TST('删除失败','error');});});
+
+E.batchDl.addEventListener('click',function(){var c=getChecked();if(!c.length)return TST('请先勾选文件','error');M.dlZip(c);});
+E.batchAllDl.addEventListener('click',function(){fetch('/files').then(function(r){return r.json();}).then(function(d){var n=d.files.map(function(f){return f.name;});if(!n.length)return TST('无文件','error');M.dlZip(n);});});
+
+E.refreshBtn.addEventListener('click',loadUploaded);
+
+// ---- pending upload list ----
+function renderPending(){
+  if(!pendingFiles.length){E.fileList.innerHTML='<div class="empty-state">暂无待上传</div>';E.uploadBtn.disabled=true;E.clearBtn.disabled=true;return;}
+  E.uploadBtn.disabled=false;E.clearBtn.disabled=false;
+  var h='';
   pendingFiles.forEach(function(f,i){
     var st='待上传',sc='pending',ph='';
     if(f.status==='uploading'){st=f.progress+'%';sc='uploading';ph='<div class="progress-bar"><div class="progress-fill" style="width:'+f.progress+'%"></div></div>';}
     else if(f.status==='success'){st='已完成';sc='success'}
     else if(f.status==='error'){st='失败';sc='error'}
-    html+='<div class="file-item"><div class="file-icon">'+getIcon(f.file.name)+'</div><div class="file-info"><div class="file-name">'+f.file.name+'</div><div class="file-meta">'+formatSize(f.file.size)+'</div>'+ph+'</div><button class="del-btn" data-idx="'+i+'">&times;</button><div class="file-status '+sc+'">'+st+'</div></div>';
+    h+='<div class="file-item"><div class="file-icon">'+GI(f.file.name)+'</div><div class="file-main"><div class="file-name-row"><span class="file-name-text">'+f.file.name+'</span></div><div class="file-meta"><span>'+FS(f.file.size)+'</span></div>'+ph+'</div><button class="btn-icon danger" data-pdel="'+i+'">&times;</button><span class="pending-status '+sc+'">'+st+'</span></div>';
   });
-  el.fileList.innerHTML=html;
-  el.fileList.querySelectorAll('.del-btn').forEach(function(b){
-    b.addEventListener('click',function(e){e.stopPropagation();pendingFiles.splice(+this.dataset.idx,1);renderList();});
-  });
+  E.fileList.innerHTML=h;
+  E.fileList.querySelectorAll('[data-pdel]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();pendingFiles.splice(+this.dataset.pdel,1);renderPending();});});
 }
+
+E.dropZone.addEventListener('click',function(){E.fileInput.click();});
+E.fileInput.addEventListener('change',function(){addFiles(this.files);this.value='';});
+E.dropZone.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('drag-over');});
+E.dropZone.addEventListener('dragleave',function(){this.classList.remove('drag-over');});
+E.dropZone.addEventListener('drop',function(e){e.preventDefault();this.classList.remove('drag-over');addFiles(e.dataTransfer.files);});
 
 function addFiles(files){
-  var skipped=[],oversized=[];
+  var sk=[],os=[];
   for(var i=0;i<files.length;i++){
-    if(files[i].size>MAX_FSIZE){oversized.push(files[i].name+'('+formatSize(files[i].size)+')');continue;}
-    if(uploadedNames[files[i].name]){skipped.push(files[i].name);continue;}
+    if(files[i].size>MAX_F){os.push(files[i].name+'('+FS(files[i].size)+')');continue;}
+    if(uploadedNames[files[i].name]){sk.push(files[i].name);continue;}
     var dup=false;
     for(var j=0;j<pendingFiles.length;j++){if(pendingFiles[j].file.name===files[i].name&&pendingFiles[j].file.size===files[i].size){dup=true;break;}}
-    if(!dup){pendingFiles.push({file:files[i],status:'pending',progress:0});}
-    else{skipped.push(files[i].name);}
+    if(!dup)pendingFiles.push({file:files[i],status:'pending',progress:0});
+    else sk.push(files[i].name);
   }
-  if(oversized.length)showToast('超过 100MB 限制: '+oversized.join(', '),'error');
-  else if(skipped.length)showToast('已跳过重复: '+skipped.join(', '),'error');
-  renderList();
+  if(os.length)TST('超100MB: '+os.join(', '),'error');
+  else if(sk.length)TST('跳过重复: '+sk.join(', '),'error');
+  renderPending();
 }
 
-function getChecked(){
-  var cbs=el.uploadedList.querySelectorAll('.file-check:checked');
-  return Array.prototype.map.call(cbs,function(cb){return cb.value;});
-}
-
-function renderUploaded(files){
-  uploadedNames={};
-  if(!files||files.length===0){
-    el.uploadedList.innerHTML='<div class="empty-state">暂无已上传文件</div>';
-    el.fileCount.textContent='';
-    el.selectAll.checked=false;
-    return;
-  }
-  el.fileCount.textContent='(共 '+files.length+' 个)';
-  el.selectAll.checked=false;
-  var html='';
-  files.forEach(function(f){
-    uploadedNames[f.name]=true;
-    html+='<div class="file-item"><input type="checkbox" class="file-check" value="'+f.name+'"><div class="file-icon">'+getIcon(f.name)+'</div><div class="file-info"><div class="file-name">'+f.name+'</div><div class="file-meta">'+formatSize(f.size)+'</div></div><a class="dl-btn" href="/download?name='+encodeURIComponent(f.name)+'" download title="下载">&#8595;</a><button class="del-btn" data-file="'+f.name+'" title="删除">&times;</button></div>';
-  });
-  el.uploadedList.innerHTML=html;
-
-  el.uploadedList.querySelectorAll('.del-btn').forEach(function(b){
-    b.addEventListener('click',function(e){
-      e.stopPropagation();
-      var fname=this.dataset.file;
-      if(!confirm('确定删除 '+fname+' ?'))return;
-      fetch('/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filenames:[fname]})})
-        .then(function(r){return r.json();})
-        .then(function(d){if(d.success){delete uploadedNames[fname];showToast('已删除: '+fname,'success');loadUploaded();}else{showToast(d.error||'删除失败','error');}})
-        .catch(function(){showToast('删除失败','error');});
-    });
-  });
-}
-
-function loadUploaded(){
-  fetch('/files').then(function(r){return r.json();}).then(function(d){renderUploaded(d.files);}).catch(function(){el.uploadedList.innerHTML='<div class="empty-state">加载失败</div>';});
-}
-
-el.selectAll.addEventListener('change',function(){
-  var cbs=el.uploadedList.querySelectorAll('.file-check');
-  for(var i=0;i<cbs.length;i++)cbs[i].checked=this.checked;
-});
-
-el.batchDel.addEventListener('click',function(){
-  var checked=getChecked();
-  if(!checked.length){showToast('请先勾选文件','error');return;}
-  if(!confirm('确定删除 '+checked.length+' 个文件?'))return;
-  fetch('/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filenames:checked})})
-    .then(function(r){return r.json();})
-    .then(function(d){showToast('已删除 '+d.deleted.length+' 个'+(d.missing.length?'，'+d.missing.length+' 个不存在':''),'success');loadUploaded();})
-    .catch(function(){showToast('删除失败','error');});
-});
-
-el.batchDl.addEventListener('click',function(){
-  var checked=getChecked();
-  if(!checked.length){showToast('请先勾选文件','error');return;}
-  var url='/batch-download?names='+encodeURIComponent(checked.join(','));
-  var a=document.createElement('a');
-  a.href=url;a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);
-  showToast('开始打包下载 '+checked.length+' 个文件','success');
-});
-
-el.batchAllDl.addEventListener('click',function(){
-  fetch('/files').then(function(r){return r.json();}).then(function(d){
-    if(!d.files||!d.files.length){showToast('没有可下载的文件','error');return;}
-    var all=d.files.map(function(f){return f.name;}).join(',');
-    var a=document.createElement('a');
-    a.href='/batch-download?names='+encodeURIComponent(all);a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);
-    showToast('开始打包下载全部 '+d.files.length+' 个文件','success');
-  });
-});
-
-function updateEditor(){
-  var t=el.fileType.value;
-  el.codeEditor.value=templates[t]||'';
-  var base=el.fileName.value.replace(/\.[^.]+$/,'');
-  el.fileName.value=(base||'untitled')+'.'+t;
-}
-
-el.fileType.addEventListener('change',updateEditor);
-el.fileName.addEventListener('blur',function(){
-  var v=this.value.trim();
-  if(!v){this.value='';return;}
-  this.value=v.replace(/\.[^.]+$/,'')+'.'+el.fileType.value;
-});
-
-el.dropZone.addEventListener('click',function(){el.fileInput.click();});
-el.fileInput.addEventListener('change',function(){addFiles(this.files);this.value='';});
-el.dropZone.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('drag-over');});
-el.dropZone.addEventListener('dragleave',function(){this.classList.remove('drag-over');});
-el.dropZone.addEventListener('drop',function(e){e.preventDefault();this.classList.remove('drag-over');addFiles(e.dataTransfer.files);});
-
-el.uploadBtn.addEventListener('click',function(){
-  var pending=pendingFiles.filter(function(f){return f.status!=='success';});
-  if(!pending.length){showToast('所有文件已上传','success');return;}
+E.uploadBtn.addEventListener('click',function(){
+  var pd=pendingFiles.filter(function(f){return f.status!=='success';});
+  if(!pd.length){TST('已全部上传','success');return;}
   var done=0,err=0,idx=0;
-  function next(){
-    if(idx>=pending.length){
-      showToast(err?'上传: '+done+' 成功, '+err+' 失败':'上传完成 '+done+' 个','success');
-      loadUploaded();return;
-    }
-    var item=pending[idx];
-    item.status='uploading';item.progress=0;renderList();
-    var fd=new FormData();fd.append('file',item.file);
-    var xhr=new XMLHttpRequest();
-    xhr.upload.addEventListener('progress',function(e){
-      if(e.lengthComputable){item.progress=Math.round(e.loaded/e.total*100);renderList();}
-    });
-    xhr.addEventListener('load',function(){
-      if(xhr.status>=200&&xhr.status<300){item.status='success';item.progress=100;done++}
-      else{item.status='error';err++}
-      renderList();idx++;next();
-    });
-    xhr.addEventListener('error',function(){item.status='error';err++;renderList();idx++;next();});
-    xhr.open('POST','/upload');xhr.send(fd);
+  function nxt(){
+    if(idx>=pd.length){TST(err?'完成 '+done+' 成功, '+err+' 失败':'上传完成 '+done+' 个','success');loadUploaded();return;}
+    var it=pd[idx];it.status='uploading';it.progress=0;renderPending();
+    var fd=new FormData();fd.append('file',it.file);
+    var x=new XMLHttpRequest();
+    x.upload.addEventListener('progress',function(e){if(e.lengthComputable){it.progress=Math.round(e.loaded/e.total*100);renderPending();}});
+    x.addEventListener('load',function(){if(x.status>=200&&x.status<300){it.status='success';it.progress=100;done++}else{it.status='error';err++}renderPending();idx++;nxt();});
+    x.addEventListener('error',function(){it.status='error';err++;renderPending();idx++;nxt();});
+    x.open('POST','/upload');x.send(fd);
   }
-  next();
+  nxt();
 });
 
-el.clearBtn.addEventListener('click',function(){pendingFiles=[];renderList();});
-el.refreshBtn.addEventListener('click',loadUploaded);
+E.clearBtn.addEventListener('click',function(){pendingFiles=[];renderPending();});
 
-el.createBtn.addEventListener('click',function(){
-  var name=el.fileName.value.trim();
-  if(!name){showToast('请输入文件名','error');return;}
-  el.createBtn.disabled=true;el.createBtn.textContent='创建中...';
-  fetch('/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:name,content:el.codeEditor.value})})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(d.success){showToast('创建成功: '+d.filename,'success');el.codeEditor.value=templates[el.fileType.value]||'';el.fileName.value='untitled.'+el.fileType.value;}
-      else showToast('创建失败','error');
-    }).catch(function(){showToast('创建失败','error');})
-    .finally(function(){el.createBtn.disabled=false;el.createBtn.textContent='创建文件';});
+// ---- create file ----
+function updEditor(){var t=E.fileType.value;E.codeEditor.value=T[t]||'';E.fileName.value='untitled.'+t;}
+E.fileType.addEventListener('change',updEditor);
+E.fileName.addEventListener('blur',function(){var v=this.value.trim();if(!v){this.value='';return;}this.value=v.replace(/\.[^.]+$/,'')+'.'+E.fileType.value;});
+
+E.createBtn.addEventListener('click',function(){
+  var n=E.fileName.value.trim(),c=E.codeEditor.value;
+  if(!n)return TST('输入文件名','error');
+  E.createBtn.disabled=true;E.createBtn.textContent='创建中...';
+  fetch('/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:n,content:c})})
+    .then(function(r){return r.json();}).then(function(d){if(d.success){TST('创建: '+d.filename,'success');updEditor();}else TST('失败','error');})
+    .catch(function(){TST('失败','error');}).finally(function(){E.createBtn.disabled=false;E.createBtn.textContent='创建文件';});
 });
 
-document.querySelectorAll('.tab').forEach(function(t){
-  t.addEventListener('click',function(){
-    document.querySelectorAll('.tab,.panel').forEach(function(x){x.classList.remove('active');});
-    t.classList.add('active');document.getElementById('panel-'+t.dataset.panel).classList.add('active');
-    if(t.dataset.panel==='upload')loadUploaded();
-  });
-});
+// ---- tabs ----
+document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.tab,.panel').forEach(function(x){x.classList.remove('active');});t.classList.add('active');document.getElementById('panel-'+t.dataset.panel).classList.add('active');if(t.dataset.panel==='upload')loadUploaded();});});
 
-updateEditor();loadUploaded();
+// ---- rename ----
+var M={
+  showRename:function(name){currentRename=name;E.renameInput.value=name;E.renameOverlay.classList.add('show');E.renameInput.focus();E.renameInput.select();},
+  renameCancel:function(){E.renameOverlay.classList.remove('show');currentRename='';},
+  doRename:function(){var n=E.renameInput.value.trim();if(!n||n===currentRename){M.renameCancel();return;}fetch('/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old:currentRename,new:n})}).then(function(r){return r.json();}).then(function(d){if(d.success){TST('已重命名: '+d.filename,'success');loadUploaded();}else TST(d.error||'失败','error');}).catch(function(){TST('失败','error');});M.renameCancel();},
+  delFile:function(name){if(!confirm('删除 '+name+' ?'))return;fetch('/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filenames:[name]})}).then(function(r){return r.json();}).then(function(d){if(d.success){delete uploadedNames[name];TST('已删除','success');loadUploaded();}else TST(d.error||'失败','error');}).catch(function(){TST('失败','error');});},
+  dlZip:function(names){var a=document.createElement('a');a.href='/batch-download?names='+encodeURIComponent(names.join(','));a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);TST('打包下载 '+names.length+' 个文件','success');}
+};
+E.renameConfirm.addEventListener('click',M.doRename);
+E.renameInput.addEventListener('keydown',function(e){if(e.key==='Enter')M.doRename();if(e.key==='Escape')M.renameCancel();});
+E.renameOverlay.addEventListener('click',function(e){if(e.target===this)M.renameCancel();});
+
+updEditor();loadUploaded();
 })();
 </script>
 </body>
