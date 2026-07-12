@@ -94,12 +94,21 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
 
 .info-bar{text-align:center;color:#444;font-size:11px;margin-top:24px}
 
-.rename-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:200;display:none}
+.rename-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:200;display:none}
 .rename-overlay.show{display:flex}
-.rename-box{background:#1a1a30;border:1px solid #2a2a4a;border-radius:12px;padding:24px;width:320px;max-width:90vw}
+.rename-box{background:#1a1a30;border:1px solid #2a2a4a;border-radius:12px;padding:24px;width:340px;max-width:90vw}
 .rename-box h3{color:#ddd;font-size:15px;margin-bottom:16px}
 .rename-box .btn-row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
 .rename-box .btn-row .btn{padding:8px 18px;font-size:13px}
+.rename-box .file-list-mini{max-height:180px;overflow-y:auto;margin:10px 0;background:#12121e;border-radius:8px;padding:4px 0}
+.rename-box .file-list-mini .mini-item{font-size:12px;color:#999;padding:4px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:300;display:none}
+.loading-overlay.show{display:flex}
+.loading-spinner{width:44px;height:44px;border:3px solid #2a2a4a;border-top-color:#7c8aff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-box{background:#1a1a30;border:1px solid #2a2a4a;border-radius:12px;padding:32px 40px;text-align:center}
+.loading-box p{margin-top:16px;color:#999;font-size:13px}
 
 @media(max-width:480px){
   .container{padding:16px 10px}
@@ -184,10 +193,33 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
   </div>
 </div>
 
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="loading-spinner"></div>
+    <p>正在打包...</p>
+  </div>
+</div>
+
+<div class="rename-overlay" id="packOverlay">
+  <div class="rename-box">
+    <h3>打包下载</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:6px" id="packCount"></p>
+    <div class="file-list-mini" id="packFileList"></div>
+    <div style="margin-top:10px">
+      <label class="form-label" style="font-size:12px">压缩包名称</label>
+      <input type="text" id="packName" style="font-size:13px">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-gray" onclick="M.packCancel()">取消</button>
+      <button class="btn btn-primary" id="packConfirm">开始打包</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
 var E={};
-'volist|dropZone|fileInput|fileList|uploadBtn|clearBtn|createBtn|fileName|fileType|codeEditor|toast|uploadedList|refreshBtn|selectAll|batchDel|batchDl|batchAllDl|searchInput|sortBy|statsText|renameOverlay|renameInput|renameConfirm'.split('|').forEach(function(k){
+'volist|dropZone|fileInput|fileList|uploadBtn|clearBtn|createBtn|fileName|fileType|codeEditor|toast|uploadedList|refreshBtn|selectAll|batchDel|batchDl|batchAllDl|searchInput|sortBy|statsText|renameOverlay|renameInput|renameConfirm|loadingOverlay|packOverlay|packName|packCount|packFileList|packConfirm'.split('|').forEach(function(k){
   var el=document.getElementById(k);if(el)E[k]=el;
 });
 
@@ -247,8 +279,8 @@ E.selectAll.addEventListener('change',function(){var c=this.checked;E.uploadedLi
 
 E.batchDel.addEventListener('click',function(){var c=getChecked();if(!c.length)return TST('请先勾选文件','error');if(!confirm('删除 '+c.length+' 个文件?'))return;fetch('/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filenames:c})}).then(function(r){return r.json();}).then(function(d){TST('已删除 '+d.deleted.length+' 个','success');loadUploaded();}).catch(function(){TST('删除失败','error');});});
 
-E.batchDl.addEventListener('click',function(){var c=getChecked();if(!c.length)return TST('请先勾选文件','error');M.dlZip(c);});
-E.batchAllDl.addEventListener('click',function(){fetch('/files').then(function(r){return r.json();}).then(function(d){var n=d.files.map(function(f){return f.name;});if(!n.length)return TST('无文件','error');M.dlZip(n);});});
+E.batchDl.addEventListener('click',function(){var c=getChecked();if(!c.length)return TST('请先勾选文件','error');M.showPack(c);});
+E.batchAllDl.addEventListener('click',function(){fetch('/files').then(function(r){return r.json();}).then(function(d){var n=d.files.map(function(f){return f.name;});if(!n.length)return TST('无文件','error');M.showPack(n);});});
 
 E.refreshBtn.addEventListener('click',loadUploaded);
 
@@ -325,17 +357,43 @@ E.createBtn.addEventListener('click',function(){
 // ---- tabs ----
 document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.tab,.panel').forEach(function(x){x.classList.remove('active');});t.classList.add('active');document.getElementById('panel-'+t.dataset.panel).classList.add('active');if(t.dataset.panel==='upload')loadUploaded();});});
 
-// ---- rename ----
+// ---- rename + pack ----
+var packFiles=[];
 var M={
   showRename:function(name){currentRename=name;E.renameInput.value=name;E.renameOverlay.classList.add('show');E.renameInput.focus();E.renameInput.select();},
   renameCancel:function(){E.renameOverlay.classList.remove('show');currentRename='';},
   doRename:function(){var n=E.renameInput.value.trim();if(!n||n===currentRename){M.renameCancel();return;}fetch('/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old:currentRename,new:n})}).then(function(r){return r.json();}).then(function(d){if(d.success){TST('已重命名: '+d.filename,'success');loadUploaded();}else TST(d.error||'失败','error');}).catch(function(){TST('失败','error');});M.renameCancel();},
   delFile:function(name){if(!confirm('删除 '+name+' ?'))return;fetch('/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filenames:[name]})}).then(function(r){return r.json();}).then(function(d){if(d.success){delete uploadedNames[name];TST('已删除','success');loadUploaded();}else TST(d.error||'失败','error');}).catch(function(){TST('失败','error');});},
-  dlZip:function(names){var a=document.createElement('a');a.href='/batch-download?names='+encodeURIComponent(names.join(','));a.download='';document.body.appendChild(a);a.click();document.body.removeChild(a);TST('打包下载 '+names.length+' 个文件','success');}
+  showPack:function(files){packFiles=files;E.packCount.textContent='共 '+files.length+' 个文件';E.packFileList.innerHTML=files.map(function(f){return'<div class="mini-item">'+f+'</div>';}).join('');E.packName.value='files_'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'.zip';E.packOverlay.classList.add('show');E.packName.focus();E.packName.select();},
+  packCancel:function(){E.packOverlay.classList.remove('show');packFiles=[];},
+  doPack:function(){
+    if(!packFiles.length)return;
+    E.packOverlay.classList.remove('show');
+    E.loadingOverlay.classList.add('show');
+    var name=E.packName.value.trim()||'files.zip';
+    var url='/batch-download?names='+encodeURIComponent(packFiles.join(','));
+    var xhr=new XMLHttpRequest();
+    xhr.open('GET',url,true);
+    xhr.responseType='blob';
+    xhr.onprogress=function(e){if(e.lengthComputable){var p=Math.round(e.loaded/e.total*100);E.loadingOverlay.querySelector('p').textContent='打包中 '+p+'%...';}};
+    xhr.onload=function(){
+      E.loadingOverlay.classList.remove('show');
+      if(xhr.status===200){
+        var a=document.createElement('a');a.href=URL.createObjectURL(xhr.response);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+        TST('下载完成: '+name,'success');
+      }else{TST('打包失败','error');}
+    };
+    xhr.onerror=function(){E.loadingOverlay.classList.remove('show');TST('网络错误','error');};
+    xhr.send();
+    packFiles=[];
+  }
 };
 E.renameConfirm.addEventListener('click',M.doRename);
 E.renameInput.addEventListener('keydown',function(e){if(e.key==='Enter')M.doRename();if(e.key==='Escape')M.renameCancel();});
 E.renameOverlay.addEventListener('click',function(e){if(e.target===this)M.renameCancel();});
+E.packConfirm.addEventListener('click',M.doPack);
+E.packName.addEventListener('keydown',function(e){if(e.key==='Enter')M.doPack();if(e.key==='Escape')M.packCancel();});
+E.packOverlay.addEventListener('click',function(e){if(e.target===this)M.packCancel();});
 
 updEditor();loadUploaded();
 })();
