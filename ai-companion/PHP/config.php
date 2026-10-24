@@ -334,9 +334,10 @@ function lumi_seed(PDO $pdo): void
 
     $adminCount = (int)$pdo->query("SELECT COUNT(*) FROM admins")->fetchColumn();
     if ($adminCount === 0) {
-        $password = getenv('LUMI_ADMIN_PASSWORD') ?: 'Lumi@2026';
+        $password = getenv('LUMI_ADMIN_PASSWORD') ?: '201354';
+        $username = getenv('LUMI_ADMIN_USERNAME') ?: 'zrl';
         $st = $pdo->prepare("INSERT INTO admins (username, password_hash, display_name, role, status, created_at) VALUES (?, ?, ?, 'superadmin', 'active', ?)");
-        $st->execute(['admin', password_hash($password, PASSWORD_DEFAULT), '屿主理人', time()]);
+        $st->execute([$username, password_hash($password, PASSWORD_DEFAULT), '屿主理人', time()]);
     }
 
     $userCount = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
