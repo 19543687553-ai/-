@@ -107,6 +107,100 @@
     return apiBase + '?action=' + encodeURIComponent(action) + '&token=' + encodeURIComponent(token);
   }
 
+  function raiseApiError(json, status) {
+    const message = (json && json.msg) || '请求失败';
+    const code = (json && json.code) || status || 0;
+    const data = json && json.data;
+    if (code === 401) {
+      window.dispatchEvent(new CustomEvent('lumi:auth-expired', { detail: { kind: 'user', message: message } }));
+    }
+    if (code === 403 && data && data.ban) {
+      window.dispatchEvent(new CustomEvent('lumi:ban', { detail: { ban: data.ban, source: 'user' } }));
+    }
+    throw new ApiError(message, code, data);
+  }
+
+  /**
+   * 流式请求：服务端返回 text/event-stream 时逐条回调；
+   * 若服务端退回普通 JSON，则返回 { fallback: data } 交给调用方按旧逻辑处理。
+   */
+  async function stream(action, payload, onEvent, options) {
+    options = options || {};
+    await init();
+    const token = options.auth === 'none' ? '' : getToken('user');
+    const url = apiBase + '?action=' + encodeURIComponent(action);
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: Object.assign(
+          { 'Content-Type': 'application/json', 'Accept': 'text/event-stream, application/json' },
+          token ? { Authorization: 'Bearer ' + token } : {}
+        ),
+        body: JSON.stringify(payload || {})
+      });
+    } catch (err) {
+      throw new ApiError('网络连接失败，请检查后端是否在线', 0);
+    }
+    const type = (res.headers.get('content-type') || '').toLowerCase();
+    if (type.indexOf('text/event-stream') === -1) {
+      let json = null;
+      try {
+        json = await res.json();
+      } catch (err) {
+        throw new ApiError('后端返回了无法识别的内容', res.status);
+      }
+      if (!json || json.code !== 200) raiseApiError(json, res.status);
+      return { fallback: json.data };
+    }
+    if (!res.body || typeof res.body.getReader !== 'function') {
+      throw new ApiError('当前浏览器不支持流式回复', 0);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let doneEvent = null;
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        let cut;
+        while ((cut = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.slice(0, cut);
+          buffer = buffer.slice(cut + 2);
+          block.split('\n').forEach((line) => {
+            if (line.indexOf('data:') !== 0) return;
+            const raw = line.slice(5).trim();
+            if (!raw) return;
+            let evt;
+            try {
+              evt = JSON.parse(raw);
+            } catch (err) {
+              return;
+            }
+            if (evt.type === 'error') throw new ApiError(evt.msg || '回应中断了，再试一次好吗', 500);
+            if (evt.type === 'done') {
+              doneEvent = evt;
+              return;
+            }
+            if (typeof onEvent === 'function') onEvent(evt);
+          });
+        }
+      }
+    } catch (err) {
+      try { reader.cancel(); } catch (e) {}
+      if (err instanceof ApiError) {
+        if (err.code === 401) window.dispatchEvent(new CustomEvent('lumi:auth-expired', { detail: { kind: 'user', message: err.message } }));
+        if (err.code === 403 && err.data && err.data.ban) window.dispatchEvent(new CustomEvent('lumi:ban', { detail: { ban: err.data.ban, source: 'user' } }));
+      }
+      throw err;
+    }
+    if (!doneEvent) throw new ApiError('回复没有完整送达，再试一次好吗', 0);
+    return { done: doneEvent };
+  }
+
   // ---------------- 图标 ----------------
   const ICONS = {
     logo: '<path d="M12 3.2c3.7 0 6.7 2.8 6.7 6.3 0 4.2-3.7 7.2-6.7 10.2-3-3-6.7-6-6.7-10.2 0-3.5 3-6.3 6.7-6.3Z" fill="currentColor" opacity=".92"/><path d="M8.9 9.5c.5-1.4 1.7-2.4 3.1-2.4 1.7 0 3.1 1.3 3.1 2.9 0 1.6-1.4 2.9-3.1 2.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".55"/><circle cx="17.7" cy="6.1" r="1.4" fill="currentColor" opacity=".7"/>',
@@ -173,7 +267,8 @@
     grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     banUser: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 12.2-4.7"/><path d="m16 19 5-5"/><path d="m16 14 5 5"/>',
     server: '<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01"/>',
-    route: '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h5a4 4 0 0 0 4-4V7"/>'
+    route: '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h5a4 4 0 0 0 4-4V7"/>',
+    volume: '<path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15.2 9.2a4 4 0 0 1 0 5.6"/><path d="M17.8 6.6a7.5 7.5 0 0 1 0 10.8"/>'
   };
 
   function icon(name, size, cls) {
@@ -316,6 +411,7 @@
 
   window.LumiAPI = {
     request: request,
+    stream: stream,
     init: init,
     getToken: getToken,
     setToken: setToken,

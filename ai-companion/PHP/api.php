@@ -473,6 +473,181 @@ function lumi_chat_suggestions(string $primary, array $state): array
     return $base;
 }
 
+function lumi_sse_start(): void
+{
+    @ini_set('zlib.output_compression', '0');
+    @ini_set('implicit_flush', '1');
+    @set_time_limit(0);
+    ignore_user_abort(true);
+    header('Content-Type: text/event-stream; charset=utf-8');
+    header('Cache-Control: no-cache, no-transform');
+    header('Connection: keep-alive');
+    header('X-Accel-Buffering: no');
+    while (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
+}
+
+function lumi_sse_send(array $payload): void
+{
+    echo 'data: ' . json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE) . "\n\n";
+    @ob_flush();
+    @flush();
+}
+
+/**
+ * 从流式缓冲里取出可安全显示的文本：剔除 <mood> 标签，并暂存可能是标签前缀的尾部。
+ */
+function lumi_stream_filter(string &$pending, bool $final = false): string
+{
+    $pending = preg_replace('/<mood>.*?<\/mood>/is', '', $pending) ?? $pending;
+    if ($final) {
+        $pending = preg_replace('/<mood[^>]*>/i', '', $pending) ?? $pending;
+        $pending = preg_replace('/<\/mood>/i', '', $pending) ?? $pending;
+    }
+    $cut = strlen($pending);
+    if (!$final && ($lt = strrpos($pending, '<')) !== false) {
+        $tail = substr($pending, $lt);
+        if (strpos($tail, '>') === false && strlen($tail) < 16) {
+            $cut = $lt;
+        }
+    }
+    if ($cut <= 0) {
+        return '';
+    }
+    $out = substr($pending, 0, $cut);
+    $pending = substr($pending, $cut);
+    return $out;
+}
+
+function lumi_stream_text(string $text, callable $emit): void
+{
+    // 控制总时长：长回复分更多字一组，短回复逐字出现，最多约 4 秒
+    $length = mb_strlen($text);
+    $size = max(1, (int)ceil($length / 140));
+    foreach (mb_str_split($text, $size) as $chunk) {
+        $emit($chunk);
+        if (connection_aborted()) {
+            return;
+        }
+        usleep(30000);
+    }
+}
+
+function lumi_stream_chat(array $user, int $conversationId, array $analysis, array $safety): void
+{
+    lumi_sse_start();
+    lumi_sse_send(['type' => 'start', 'conversation_id' => $conversationId]);
+
+    $pending = '';
+    $shown = '';
+    $emit = static function (string $text) use (&$pending, &$shown): void {
+        $pending .= $text;
+        $visible = lumi_stream_filter($pending);
+        if ($visible !== '') {
+            $shown .= $visible;
+            lumi_sse_send(['type' => 'delta', 'text' => $visible]);
+        }
+    };
+
+    try {
+        $config = lumi_model_config();
+        $context = lumi_context_messages((int)$user['id'], $conversationId, (int)lumi_setting('max_context_messages', '18'));
+        $degraded = true;
+        $tokens = 0;
+        $latency = 0;
+        $mood = '';
+        $modelError = '';
+
+        if ($config['configured']) {
+            $messages = array_merge(
+                [['role' => 'system', 'content' => lumi_build_system_prompt($user)]],
+                $context
+            );
+            $result = lumi_model_stream($messages, $emit);
+            $latency = (int)($result['latency'] ?? 0);
+            if ($result['ok']) {
+                $degraded = false;
+                $tokens = (int)($result['usage']['total_tokens'] ?? 0);
+                $mood = lumi_extract_mood_tag($result['content']);
+            } else {
+                $modelError = (string)($result['error'] ?? '');
+                if ($shown === '') {
+                    // 服务商可能不支持 stream，退回一次普通请求
+                    $retry = lumi_model_request($messages);
+                    $latency += (int)($retry['latency'] ?? 0);
+                    if ($retry['ok']) {
+                        $degraded = false;
+                        $tokens = (int)($retry['usage']['total_tokens'] ?? 0);
+                        $content = $retry['content'];
+                        $mood = lumi_extract_mood_tag($content);
+                        lumi_stream_text($content, $emit);
+                    } else {
+                        $modelError = (string)($retry['error'] ?? $modelError);
+                    }
+                } else {
+                    $emit('（刚刚信号断了一下，但我还在）');
+                }
+            }
+        }
+
+        if ($shown === '') {
+            $degraded = true;
+            $fallback = lumi_fallback_reply($user, (string)(end($context)['content'] ?? ''));
+            $mood = $fallback['mood'];
+            lumi_stream_text($fallback['content'], $emit);
+        }
+
+        $tail = lumi_stream_filter($pending, true);
+        if ($tail !== '') {
+            $shown .= $tail;
+            lumi_sse_send(['type' => 'delta', 'text' => $tail]);
+        }
+        if ($mood === '') {
+            $mood = lumi_mood_label($user);
+        }
+
+        $user = lumi_apply_assistant_mood($user, $mood);
+        lumi_record_mood($user, 'chat', true);
+        $saved = lumi_save_message((int)$user['id'], $conversationId, 'assistant', $shown, $mood, $tokens, true, [
+            'degraded' => $degraded,
+            'latency' => $latency,
+            'model_error' => $modelError,
+        ]);
+
+        $state = lumi_public_state($user);
+        lumi_sse_send([
+            'type' => 'done',
+            'message' => [
+                'id' => $saved['id'],
+                'role' => 'assistant',
+                'content' => $shown,
+                'emotion' => $mood,
+                'mood_after' => $mood,
+                'created_at' => $saved['created_at'],
+                'is_read' => 1,
+                'pinned' => 0,
+                'tokens' => $tokens,
+                'meta' => ['degraded' => $degraded],
+            ],
+            'state' => $state,
+            'suggestions' => lumi_chat_suggestions($analysis['primary'], $state),
+            'degraded' => $degraded,
+            'model_configured' => $config['configured'],
+            'latency' => $latency,
+            'flagged' => $safety['flagged'],
+            'unread_count' => lumi_unread_count((int)$user['id']),
+        ]);
+    } catch (Throwable $e) {
+        @file_put_contents(
+            lumi_data_dir() . '/error.log',
+            '[' . lumi_now_text() . '] stream: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL,
+            FILE_APPEND | LOCK_EX
+        );
+        lumi_sse_send(['type' => 'error', 'msg' => '回应中断了，再试一次好吗']);
+    }
+}
+
 function lumi_action_chat(): void
 {
     $user = lumi_require_user();
@@ -509,6 +684,10 @@ function lumi_action_chat(): void
     lumi_touch_user((int)$user['id']);
 
     $analysis = lumi_analyze_user_message($text);
+    if ((int)lumi_param('stream', 0) === 1) {
+        lumi_stream_chat($user, $conversationId, $analysis, $safety);
+        exit;
+    }
     $context = lumi_context_messages((int)$user['id'], $conversationId, (int)lumi_setting('max_context_messages', '18'));
     $reply = lumi_generate_reply($user, $context);
     $user = lumi_apply_assistant_mood($user, (string)$reply['mood']);

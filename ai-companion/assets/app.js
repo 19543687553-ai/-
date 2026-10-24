@@ -295,7 +295,7 @@
       if (dot) syncThemeUI();
     });
 
-    ['prefProactive', 'prefSound', 'prefMotion'].forEach((id) => {
+    ['prefProactive', 'prefSound', 'prefTts', 'prefMotion'].forEach((id) => {
       const el = document.getElementById(id);
       el.addEventListener('click', () => {
         const on = el.getAttribute('aria-checked') !== 'true';
@@ -454,7 +454,7 @@
     const gestureIcon = GESTURE_ICON[m.meta && m.meta.gesture] || 'hand';
     const gestureName = (m.meta && m.meta.gesture_label) || GESTURE_NAME[m.meta && m.meta.gesture] || '';
     const time = UI.formatTime(m.created_at);
-    return '<article class="msg-row ' + (isUser ? 'user' : '') + (proactive ? ' proactive' : '') + '" data-id="' + m.id + '">' +
+    return '<article class="msg-row ' + (isUser ? 'user' : '') + (proactive ? ' proactive' : '') + (m.streaming ? ' streaming' : '') + '" data-id="' + m.id + '">' +
       (isUser ? '' : '<span class="msg-avatar"><img src="' + AVATAR + '" alt=""></span>') +
       '<div class="msg-col">' +
         (proactive ? '<span class="proactive-tag">' + UI.icon('sparkles', 12) + '她主动来找你</span>' : '') +
@@ -519,6 +519,8 @@
 
     const input = $('#msgInput');
     const tempId = 'tmp-' + Date.now();
+    const streamId = 'stream-' + Date.now();
+    let reply = null;
     state.messages.push({
       id: tempId,
       role: 'user',
@@ -539,29 +541,68 @@
     state.typingTimer = setTimeout(() => { $('#typingRow').hidden = false; scrollBottom(); }, 420);
 
     try {
-      const data = await LumiAPI.request('chat', {
+      const result = await LumiAPI.stream('chat', {
         message: text,
-        conversation_id: state.conversationId || 0
-      }, { timeout: 60000 });
+        conversation_id: state.conversationId || 0,
+        stream: 1
+      }, (evt) => {
+        if (evt.type === 'start') {
+          clearTimeout(state.typingTimer);
+          $('#typingRow').hidden = true;
+          state.conversationId = evt.conversation_id || state.conversationId;
+          reply = {
+            id: streamId,
+            role: 'assistant',
+            content: '',
+            created_at: Math.floor(Date.now() / 1000),
+            pinned: 0,
+            meta: {},
+            streaming: true
+          };
+          state.messages.push(reply);
+          renderMessages();
+          scrollBottom();
+          return;
+        }
+        if (evt.type === 'delta' && reply) {
+          reply.content += evt.text || '';
+          updateStreamingBubble(streamId, reply.content);
+        }
+      });
+
       clearTimeout(state.typingTimer);
       $('#typingRow').hidden = true;
-      state.conversationId = data.conversation_id || state.conversationId;
-      if (data.message) state.messages.push(data.message);
-      if (state.user) state.user.total_messages = (state.user.total_messages || 0) + 2;
-      if (data.state) setMood(data.state);
-      if (data.suggestions && data.suggestions.length) renderSuggestions(data.suggestions);
-      if (data.degraded && !state.degradedNotified) {
-        state.degradedNotified = true;
-        UI.toast('模型暂时没有回应，先用离线陪伴接着你', 'warn');
+
+      if (result && result.fallback) {
+        // 后端未开启流式（或中间层缓冲），退回一次性结果
+        if (reply) {
+          state.messages = state.messages.filter((m) => m.id !== streamId);
+          reply = null;
+        }
+        applyChatResult(result.fallback);
+      } else {
+        const done = (result && result.done) || {};
+        if (reply) {
+          const msg = done.message || {};
+          reply.id = msg.id || reply.id;
+          reply.content = msg.content || reply.content;
+          reply.emotion = msg.emotion || '';
+          reply.mood_after = msg.mood_after || '';
+          reply.created_at = msg.created_at || reply.created_at;
+          reply.tokens = msg.tokens || 0;
+          reply.meta = msg.meta || {};
+          reply.streaming = false;
+        }
+        applyChatResult(done, true);
+        speakReply(reply ? reply.content : '');
       }
-      if (state.insightsLoaded) state.insightsLoaded = false;
       renderMessages();
       scrollBottom();
       if (prefs().sound !== false) UI.chime('sent');
     } catch (err) {
       clearTimeout(state.typingTimer);
       $('#typingRow').hidden = true;
-      state.messages = state.messages.filter((m) => m.id !== tempId);
+      state.messages = state.messages.filter((m) => m.id !== tempId && m.id !== streamId);
       renderMessages();
       if (err && err.code === 403 && err.data && err.data.ban) {
         showBan(err.data.ban);
@@ -575,6 +616,49 @@
       state.sending = false;
       $('#sendBtn').disabled = false;
       input.focus();
+    }
+  }
+
+  function applyChatResult(data, skipMessage) {
+    if (!data) return;
+    state.conversationId = data.conversation_id || state.conversationId;
+    if (!skipMessage && data.message) state.messages.push(data.message);
+    if (state.user) state.user.total_messages = (state.user.total_messages || 0) + 2;
+    if (data.state) setMood(data.state);
+    if (data.suggestions && data.suggestions.length) renderSuggestions(data.suggestions);
+    if (data.degraded && !state.degradedNotified) {
+      state.degradedNotified = true;
+      UI.toast('模型暂时没有回应，先用离线陪伴接着你', 'warn');
+    }
+    if (state.insightsLoaded) state.insightsLoaded = false;
+    if (!skipMessage && data.message) speakReply(data.message.content);
+  }
+
+  function updateStreamingBubble(id, text) {
+    const row = document.querySelector('.msg-row[data-id="' + id + '"]');
+    if (!row) return;
+    const bubble = row.querySelector('.msg-bubble');
+    if (bubble) bubble.textContent = text;
+    if (isNearBottom()) scrollBottom();
+  }
+
+  function speakReply(text) {
+    if (!prefs().tts) return;
+    if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') return;
+    const clean = String(text || '').replace(/<[^>]*>/g, '').trim();
+    if (!clean) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(clean);
+      utter.lang = 'zh-CN';
+      utter.rate = 0.92;
+      utter.pitch = 1.06;
+      const voices = window.speechSynthesis.getVoices();
+      const zh = voices.find((v) => /zh[-_]?cn/i.test(v.lang)) || voices.find((v) => /^zh/i.test(v.lang));
+      if (zh) utter.voice = zh;
+      window.speechSynthesis.speak(utter);
+    } catch (err) {
+      // 浏览器不支持朗读时静默跳过
     }
   }
 
@@ -1026,6 +1110,7 @@
     const prefs = u.preferences || {};
     $('#prefProactive').setAttribute('aria-checked', String(prefs.proactive !== false));
     $('#prefSound').setAttribute('aria-checked', String(prefs.sound !== false));
+    $('#prefTts').setAttribute('aria-checked', String(!!prefs.tts));
     $('#prefMotion').setAttribute('aria-checked', String(!!prefs.reduce_motion));
     document.body.classList.toggle('reduce-motion', !!prefs.reduce_motion);
     $('#fontSizeValue').textContent = u.font_size || 15;
@@ -1084,7 +1169,7 @@
       proactive: $('#prefProactive').getAttribute('aria-checked') === 'true',
       sound: $('#prefSound').getAttribute('aria-checked') === 'true',
       reduce_motion: $('#prefMotion').getAttribute('aria-checked') === 'true',
-      tts: false
+      tts: $('#prefTts').getAttribute('aria-checked') === 'true'
     };
     try {
       const data = await LumiAPI.request('updateProfile', Object.assign(profilePayload(), { preferences: preferences }));

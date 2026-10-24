@@ -1,7 +1,7 @@
 # 心屿 · AI 情感陪伴机器人 — 交接文档
 
 > 面向下一个接手本项目的 AI / 工程师。请先完整读完本文件，再动代码。
-> 最后更新：2026-10-24 · 版本：v1.1.0
+> 最后更新：2026-10-24 · 版本：v1.2.0
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前状态与交付物
 
-- 版本：`v1.1.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
-- 安装包：`/workspace/AI 情感陪伴-v1.1.0.zip`（566 KB，22 个文件，**不含** `PHP/data/`）
+- 版本：`v1.2.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
+- 安装包：`/workspace/AI 情感陪伴-v1.2.0.zip`（**不含** `PHP/data/`）
 - 默认账号：
   - 管理员：`zrl / 201354`（首次建库时写入，可用环境变量覆盖）
   - 体验用户：`demo / demo123`（昵称「晚晚」，有 12 条种子对话与 14 天情绪记录）
@@ -30,7 +30,7 @@
   - 另一用户：`chen / demo123`
 - 模型：默认 DeepSeek 预设，但**未配置 Key**，因此默认走离线陪伴模板。真实对话需在后台「模型配置」填 Key。
 
-功能完成度：登录注册、四套主题、情绪引擎、主动说话、手势互动、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型 —— 均已实现并通过浏览器验证。
+功能完成度：登录注册、四套主题、情绪引擎、主动说话、手势互动、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、**SSE 流式对话（打字机）**、**语音朗读开关** —— 均已实现并通过浏览器验证。
 
 ---
 
@@ -134,6 +134,23 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 `adminBanUser` 参数：`user_id`、`reason`（≥2 字）、`until_at`（**Unix 秒**，必须 > 当前时间）、`permanent`。
 返回 `ban`：`{reason, until_at, until_text, banned_at, banned_at_text, permanent, remaining_seconds}`，`until_text` 精确到秒。前端弹窗展示原因 + 封禁时间 + 解封时间 + 倒计时 + 编号。
 
+### 流式对话（SSE，v1.2.0 新增）
+
+`chat` 增加可选参数 `stream=1`。未带或为 `0` 时行为与旧版完全一致（返回普通 JSON）。带 `stream=1` 时响应头变为 `Content-Type: text/event-stream`，每行 `data: {json}\n\n`，事件类型：
+
+| type | 时机 | 字段 |
+| --- | --- | --- |
+| `start` | 用户消息已落库、开始生成前 | `conversation_id` |
+| `delta` | 模型/模板每出一段文本 | `text`（已剔除 `<mood>` 标签） |
+| `done` | 回复已落库 | `message`、`state`、`suggestions`、`degraded`、`model_configured`、`latency`、`flagged`、`unread_count` |
+| `error` | 生成中抛异常（同时写 `PHP/data/error.log`） | `msg` |
+
+- 服务端：`api.php` 的 `lumi_sse_start / lumi_sse_send / lumi_stream_filter / lumi_stream_text / lumi_stream_chat`；`lumi_action_chat()` 在保存用户消息后按 `stream` 分流。
+- 模型流式：`emotion.php` 的 `lumi_model_stream($messages, $onDelta, $override)`，`CURLOPT_WRITEFUNCTION` 逐行解析 `data:`，兼容服务商忽略 `stream` 返回普通 JSON（此时整段回调一次）。
+- 失败路径：模型流失败且尚未输出任何内容 → 退回一次 `lumi_model_request` 并模拟打字；仍失败 → `lumi_fallback_reply` + 模拟打字。已输出部分后中断 → 追加「（刚刚信号断了一下，但我还在）」再收尾。
+- 模拟打字：`lumi_stream_text()` 按字长自适应分组（最多约 140 段、每段 30ms），避免长回复拖太久。
+- 前端：`LumiAPI.stream(action, payload, onEvent)` 解析 SSE；若响应不是 `text/event-stream`（例如被中间层缓冲成 JSON）则返回 `{fallback: data}`，调用方按旧逻辑处理。
+
 ---
 
 ## 5. 情绪系统（产品核心，改动请谨慎）
@@ -190,7 +207,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 ### 文件职责
 
 - `assets/config.js`：API 地址与候选、`storagePrefix`
-- `assets/api.js`：`ApiError`、`LumiAPI`（init/request/getToken/setToken/downloadUrl）、`ICONS`（约 70 个 SVG path）、`icon()`、`THEMES`、`applyTheme()`、`UI`（escapeHTML/formatTime/relativeTime/toast/debounce/chime 等）
+- `assets/api.js`：`ApiError`、`LumiAPI`（init/request/stream/getToken/setToken/downloadUrl）、`ICONS`（约 70 个 SVG path）、`icon()`、`THEMES`、`applyTheme()`、`UI`（escapeHTML/formatTime/relativeTime/toast/debounce/chime 等）
 - `assets/base.css`：设计令牌与通用组件（按钮、字段、开关、弹窗、封禁弹窗、toast、`[hidden]`）
 - `index.html` + `auth.css` + `auth.js`：登录注册
 - `app.html` + `app.css` + `app.js`：陪伴主界面
@@ -205,6 +222,10 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 ### 主界面
 
 左侧导航（桌面竖栏 / 移动底栏）+ 聊天区 + 右侧情绪栏；视图 `chat/insights/memories/settings`。`setMood()` 用 `--mood-a/--mood-b` 驱动光晕。包装输入框、手势条、建议 chips。轮询 22s。封禁监听 `lumi:ban`。
+
+**发送消息（v1.2.0）**：`sendMessage()` 调 `LumiAPI.stream('chat', {message, conversation_id, stream:1}, onEvent)`。`start` 时插入一条 `id='stream-<ts>'` 的临时助手消息（`streaming:true`，CSS 显示闪烁光标）；`delta` 只调用 `updateStreamingBubble()` 改那一个气泡的 `textContent`（**不要 `renderMessages()` 整表重绘**，否则滚动跳动）；`done` 用真实 `message` 覆盖临时消息字段并在下一次 `renderMessages()` 落地；返回 `{fallback}` 时走旧的一次性逻辑。失败时移除临时用户/助手消息并回填输入框，`403+ban` 弹封禁弹窗。
+
+**语音朗读**：设置页 `#prefTts` 写入 `users.preferences.tts`（后端 `updateProfile` 的白名单含 `tts`）。开启后 `speakReply()` 用浏览器 `speechSynthesis` 读助手回复；不支持时静默跳过。注意开关点击绑定列表必须包含 `prefTts`（曾漏绑导致永远保存 false）。
 
 ### 后台
 
@@ -231,17 +252,31 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 | 日期/下拉筛选重复请求 | `input` 事件监听包含 SELECT/date | `onContentInput` 提前 return，交给 `change` |
 | 图片底部水印 | 生成图自带水印 | `login-bg.jpg` 用 PIL 裁掉底部 110px |
 | 后台提示默认账号仍是 admin | 文案遗漏 | `admin.html` 与 `config.php` 同步为 `zrl` |
+| SSE 不流式、一次性吐出 | zlib 压缩 / PHP 输出缓冲 / 反向代理缓冲 | `lumi_sse_start()` 关 zlib、清空 ob、发 `X-Accel-Buffering: no`；Nginx 还需 `proxy_buffering off` |
+| 流式时滚动跳动、列表闪 | 每个 delta 都 `renderMessages()` 整表重绘 | 只更新对应气泡的 `textContent`（`updateStreamingBubble`） |
+| 回复出现两条（重复） | `done` 又把 `message` push 进列表 | 临时消息替换为真实消息，`applyChatResult(done, true)` 跳过 push |
+| 气泡里冒出 `<mood>happy</mood>` | 逐段输出时标签被拆开 | `lumi_stream_filter()` 暂存疑似未闭合的 `<` 尾部，`final` 时再清残留 |
+| 语音开关点了没反应、保存恒为 false | 开关绑定列表漏了 `prefTts` | `bindUI()` 的 `['prefProactive','prefSound','prefTts','prefMotion']` |
+| 右侧心情卡片被压成一条、情绪球被裁 | `.app-side` 是 flex 列，子项默认收缩 | `.app-side > * { flex: 0 0 auto; }` |
 
 ---
 
 ## 9. 验证方法（改完必做）
 
-1. 语法：`php -l PHP/api.php && php -l PHP/config.php && php -l PHP/emotion.php && node --check assets/admin.js`
+1. 语法：`php -l PHP/api.php && php -l PHP/config.php && php -l PHP/emotion.php && node --check assets/admin.js && node --check assets/api.js && node --check assets/app.js`
 2. 接口冒烟：登录取 token，逐个请求 `adminStats/adminUsers/adminUserDetail/adminMoodAnalytics/adminSettings/adminModelList/adminSystemInfo`，确认 200 与字段完整。
 3. 封禁链路：`adminBanUser` 用 `until_at = now + 125`，确认 `remaining_seconds=125`、`until_text` 到秒；再用被封账号登录确认 403 + `ban`。
 4. 拉取模型：本地起一个 mock `/models`（返回含重复项），验证去重、排序、搜索、点击填入、空 Key 与错误 Key 提示。
-5. 浏览器：至少覆盖 1920×1080、1366×768、844×390、390×844；检查横向溢出、输入框 16px、横屏首屏可见输入区、抽屉标签完整、控制台 0 报错。
-6. 前台链路：demo 登录 → 发消息 → 情绪变化 → 手势 → 主动说话（调小 idle 或等 75s）→ 主题切换 → 设置保存 → 反馈提交；momo 登录 → 封禁弹窗。
+5. 流式链路：
+   ```bash
+   curl -sN -X POST 'http://127.0.0.1:8080/PHP/api.php?action=chat' \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" \
+     -d '{"message":"今天有点累","stream":1}'
+   ```
+   应看到 `start` → 多条 `delta` → `done`，且响应头含 `Content-Type: text/event-stream`。
+   模型流式可另起 mock SSE 服务（返回 `data: {"choices":[{"delta":{"content":"..."}}]}` + `data: [DONE]`），直接 CLI 调 `lumi_model_stream()` 验证分片数、拼接文本、usage、model 名。
+6. 浏览器：至少覆盖 1920×1080、1366×768、844×390、390×844；检查横向溢出、输入框 16px、横屏首屏可见输入区、抽屉标签完整、右侧心情卡片不被压缩、控制台 0 报错。
+7. 前台链路：demo 登录 → 发消息（观察打字机、确认只有一条回复）→ 情绪变化 → 手势 → 主动说话（调小 idle 或等 75s）→ 主题切换 → 设置保存（含语音朗读开关持久化）→ 反馈提交；momo 登录 → 封禁弹窗。
 
 ---
 
@@ -266,7 +301,8 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 - SQLite 适合中小规模；高并发写入需换 MySQL/Postgres，注意 `busy_timeout`。
 - `model_base` 由管理员填写，服务端会请求该地址（存在 SSRF 面），仅管理员可用；若开放给低权限角色需加白名单。
 - 无验证码、无二步验证；登录限流较基础（`rate_limits`）。
-- 用户偏好里有 `tts/sound` 字段，但**语音合成尚未接入**，前端只用 WebAudio 提示音。
+- 用户偏好 `tts` 已接入浏览器 `speechSynthesis`（v1.2.0）。它依赖本机系统语音，音色/是否可用因浏览器与系统而异，不会消耗服务商额度，也不会把文字发到第三方。
+- 流式依赖链路不缓冲：若部署在 Nginx/Apache 反向代理后，需关闭 `proxy_buffering` / `mod_deflate` 对 `text/event-stream` 的处理，否则前端会退化成一次性返回（前端有 `{fallback}` 兜底，不会报错，只是看不到打字机）。
 - 备份接口直接下载 sqlite 文件，大库需改为分卷/定时备份。
 - 仓库默认分支是 `master`，功能提交在 `trae/agent-*` 分支；确认合并后再交付。
 - `PHP/data/companion.sqlite` 曾被误提交，已从版本库移除并加入 `.gitignore`；本地文件保留，删除后会自动重建。
@@ -281,5 +317,7 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 4. **改情绪逻辑要做回归**：至少用「我今天有点难过，你可以抱抱我吗」验证不误判 angry，用「我很生气」验证能命中 angry。
 5. **改布局要测四种视口**，特别是 844×390 横屏与 390×844 竖屏。
 6. **新增后台接口**：在 `api.php` 加 `case`、在 `admin.js` 加 `render`/`data-act`、必要时同步 `HANDOFF.md` 的接口清单。
-7. **新增主题**：同步 4 处（见 §7），并检查登录页色板、后台图表配色。
-8. **交付前**：语法检查 + 接口冒烟 + 浏览器回归 + 重新打包 + 更新版本号与本文档。
+7. **新增流式接口**：照抄 `lumi_stream_chat()` 的结构（`lumi_sse_start` → `start` → `delta` → `done`/`error`），务必在 `done` 里回传落库后的完整消息，前端才能用真实 id 替换临时气泡。
+8. **新增主题**：同步 4 处（见 §7），并检查登录页色板、后台图表配色。
+9. **交付前**：语法检查 + 接口冒烟 + 浏览器回归 + 重新打包 + 更新版本号与本文档。
+10. **版本号三处一致**：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名。

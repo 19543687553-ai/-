@@ -494,6 +494,164 @@ function lumi_model_request(array $messages, array $override = []): array
     ];
 }
 
+/**
+ * 流式对话：逐段回调 delta，同时累积完整文本。
+ * 兼容服务商直接返回普通 JSON（不支持 stream）的情况，会整段回调一次。
+ */
+function lumi_model_stream(array $messages, callable $onDelta, array $override = []): array
+{
+    $config = lumi_model_config();
+    $base = $override['base'] ?? $config['base'];
+    $key = $override['key'] ?? $config['key'];
+    $model = $override['model'] ?? $config['model'];
+    $temperature = $override['temperature'] ?? $config['temperature'];
+    $maxTokens = $override['max_tokens'] ?? $config['max_tokens'];
+
+    if ($base === '' || $key === '' || $model === '') {
+        return ['ok' => false, 'error' => '模型尚未配置', 'code' => 'not_configured'];
+    }
+
+    $endpoint = lumi_model_endpoint((string)$base);
+    $body = [
+        'model' => $model,
+        'messages' => $messages,
+        'temperature' => (float)$temperature,
+        'max_tokens' => (int)$maxTokens,
+        'stream' => true,
+    ];
+    $lineBuffer = '';
+    $rawAll = '';
+    $content = '';
+    $usage = [];
+    $modelName = $model;
+    $errorMessage = '';
+    $deltas = 0;
+
+    $ch = curl_init($endpoint);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => false,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'Accept: text/event-stream',
+            'Authorization: Bearer ' . $key,
+        ],
+        CURLOPT_TIMEOUT => 75,
+        CURLOPT_CONNECTTIMEOUT => 12,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$lineBuffer, &$rawAll, &$content, &$usage, &$modelName, &$errorMessage, &$deltas, $onDelta): int {
+            if (strlen($rawAll) < 200000) {
+                $rawAll .= $chunk;
+            }
+            $lineBuffer .= $chunk;
+            while (($pos = strpos($lineBuffer, "\n")) !== false) {
+                $line = rtrim(substr($lineBuffer, 0, $pos), "\r");
+                $lineBuffer = substr($lineBuffer, $pos + 1);
+                if ($line === '' || strpos($line, 'data:') !== 0) {
+                    continue;
+                }
+                $data = trim(substr($line, 5));
+                if ($data === '' || $data === '[DONE]') {
+                    continue;
+                }
+                $json = json_decode($data, true);
+                if (!is_array($json)) {
+                    continue;
+                }
+                if (isset($json['error'])) {
+                    $err = $json['error'];
+                    $errorMessage = is_array($err) ? (string)($err['message'] ?? 'stream error') : (string)$err;
+                    continue;
+                }
+                if (isset($json['model']) && is_string($json['model'])) {
+                    $modelName = $json['model'];
+                }
+                if (isset($json['usage']) && is_array($json['usage'])) {
+                    $usage = $json['usage'];
+                }
+                $delta = $json['choices'][0]['delta']['content'] ?? '';
+                if (is_array($delta)) {
+                    $parts = '';
+                    foreach ($delta as $part) {
+                        if (is_string($part)) $parts .= $part;
+                        elseif (is_array($part) && isset($part['text'])) $parts .= (string)$part['text'];
+                    }
+                    $delta = $parts;
+                }
+                if (is_string($delta) && $delta !== '') {
+                    $content .= $delta;
+                    $deltas++;
+                    $onDelta($delta);
+                }
+            }
+            if (connection_aborted()) {
+                return 0;
+            }
+            return strlen($chunk);
+        },
+    ]);
+    $start = microtime(true);
+    $executed = curl_exec($ch);
+    $latency = (int)round((microtime(true) - $start) * 1000);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($executed === false || $curlError !== '') {
+        lumi_log_model_error('stream curl: ' . $curlError . ' endpoint=' . $endpoint);
+        return ['ok' => false, 'error' => '模型连接中断，请再试一次', 'latency' => $latency, 'code' => 'network'];
+    }
+
+    // 服务商忽略了 stream，返回普通 JSON
+    if ($deltas === 0) {
+        $json = json_decode($rawAll, true);
+        if (is_array($json) && isset($json['error'])) {
+            $err = $json['error'];
+            $errorMessage = is_array($err) ? (string)($err['message'] ?? '') : (string)$err;
+        }
+        if (is_array($json) && $errorMessage === '') {
+            $full = $json['choices'][0]['message']['content'] ?? '';
+            if (is_array($full)) {
+                $parts = '';
+                foreach ($full as $part) {
+                    if (is_string($part)) $parts .= $part;
+                    elseif (is_array($part) && isset($part['text'])) $parts .= (string)$part['text'];
+                }
+                $full = $parts;
+            }
+            $full = trim((string)$full);
+            if ($full !== '') {
+                $content = $full;
+                $usage = $json['usage'] ?? $usage;
+                $modelName = $json['model'] ?? $modelName;
+                $onDelta($full);
+                $deltas = 1;
+            }
+        }
+    }
+
+    if ($errorMessage !== '' || $httpCode >= 400) {
+        if ($errorMessage === '') {
+            $errorMessage = 'HTTP ' . $httpCode;
+        }
+        lumi_log_model_error('stream http=' . $httpCode . ' message=' . mb_substr($errorMessage, 0, 300));
+        return ['ok' => false, 'error' => '模型接口返回错误：' . mb_substr($errorMessage, 0, 160), 'latency' => $latency, 'code' => 'http_' . $httpCode];
+    }
+    if ($content === '') {
+        lumi_log_model_error('stream empty http=' . $httpCode);
+        return ['ok' => false, 'error' => '模型没有返回内容', 'latency' => $latency, 'code' => 'empty'];
+    }
+
+    return [
+        'ok' => true,
+        'content' => $content,
+        'latency' => $latency,
+        'usage' => $usage,
+        'model' => $modelName,
+    ];
+}
+
 function lumi_log_model_error(string $message): void
 {
     $file = lumi_data_dir() . '/model.log';

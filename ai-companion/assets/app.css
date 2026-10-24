@@ -376,6 +376,19 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent), 0 12px 34px color-mix(in srgb, var(--accent) 14%, transparent);
 }
+.msg-row.streaming .msg-bubble::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: caretBlink 1s steps(2, start) infinite;
+}
+@keyframes caretBlink { 50% { opacity: 0; } }
+.reduce-motion .msg-row.streaming .msg-bubble::after { animation: none; }
 
 .msg-row.proactive .msg-bubble {
   border-color: color-mix(in srgb, var(--mood-a) 26%, var(--line));
@@ -610,6 +623,7 @@
   -webkit-backdrop-filter: blur(22px);
   overflow-y: auto;
 }
+.app-side > * { flex: 0 0 auto; }
 .side-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .side-close { display: none; }
 .side-toggle { display: none; }
