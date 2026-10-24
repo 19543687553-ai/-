@@ -193,7 +193,10 @@ function lumi_action_register(): void
     }
 
     $now = time();
-    $theme = (string)lumi_setting('default_theme', 'dusk');
+    $theme = (string)lumi_param('theme', (string)lumi_setting('default_theme', 'dusk'));
+    if (!in_array($theme, ['dusk', 'dawn', 'sakura', 'forest'], true)) {
+        $theme = (string)lumi_setting('default_theme', 'dusk');
+    }
     $welcome = str_replace('{{nickname}}', $nickname, (string)lumi_setting('welcome_message', '你终于来啦。'));
     $bonus = (int)lumi_setting('register_bonus_affection', '10');
 

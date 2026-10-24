@@ -552,7 +552,7 @@
       if (data.suggestions && data.suggestions.length) renderSuggestions(data.suggestions);
       if (data.degraded && !state.degradedNotified) {
         state.degradedNotified = true;
-        UI.toast('现在先用离线陪伴模式回应你', 'warn');
+        UI.toast('模型暂时没有回应，先用离线陪伴接着你', 'warn');
       }
       if (state.insightsLoaded) state.insightsLoaded = false;
       renderMessages();

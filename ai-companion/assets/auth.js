@@ -55,7 +55,7 @@
     UI.applyTheme(theme, localStorage.getItem(PREFIX + 'accent') || '');
     syncSwatches(theme);
 
-    document.querySelectorAll('.theme-swatch').forEach((btn) => {
+    document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const name = btn.getAttribute('data-theme-choice');
         UI.applyTheme(name, '');
@@ -67,7 +67,7 @@
   }
 
   function syncSwatches(name) {
-    document.querySelectorAll('.theme-swatch').forEach((btn) => {
+    document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
       btn.setAttribute('aria-pressed', btn.getAttribute('data-theme-choice') === name ? 'true' : 'false');
     });
   }
@@ -191,6 +191,7 @@
         username: username,
         password: password,
         nickname: nickname,
+        theme: UI.currentTheme(),
         agree: 1
       }, { auth: 'none' });
       LumiAPI.setToken('user', data.token);

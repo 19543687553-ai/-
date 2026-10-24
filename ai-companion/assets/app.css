@@ -46,10 +46,13 @@
 }
 .rail-btn {
   position: relative;
-  width: 46px;
-  height: 46px;
-  display: grid;
-  place-items: center;
+  width: 56px;
+  height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   border: 1px solid transparent;
   border-radius: 15px;
   background: transparent;
@@ -79,24 +82,16 @@
   box-shadow: 0 0 12px var(--accent);
 }
 .rail-tip {
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translate(-6px, -50%);
-  padding: 6px 10px;
-  border-radius: 9px;
-  border: 1px solid var(--line);
-  background: var(--panel-strong);
-  color: var(--text-soft);
-  font-size: 10.5px;
-  letter-spacing: .08em;
+  font-size: 9.5px;
+  letter-spacing: .1em;
+  line-height: 1;
   white-space: nowrap;
-  opacity: 0;
+  color: inherit;
+  opacity: .78;
   pointer-events: none;
-  transition: opacity var(--fast), transform var(--fast);
-  box-shadow: var(--shadow-soft);
+  transition: opacity var(--fast);
 }
-.rail-btn:hover .rail-tip { opacity: 1; transform: translate(0, -50%); }
+.rail-btn:hover .rail-tip { opacity: 1; }
 .rail-foot {
   display: flex;
   flex-direction: column;
@@ -1120,7 +1115,7 @@ body.reduce-motion *::after {
   }
   .rail-foot { flex-direction: row; margin-top: 0; gap: 2px; }
   .rail-avatar { display: none; }
-  .rail-btn { width: 44px; height: 44px; border-radius: 13px; }
+  .rail-btn { width: 44px; height: 44px; display: grid; place-items: center; gap: 0; border-radius: 13px; }
   .rail-btn.active::before { left: 50%; top: auto; bottom: -7px; width: 16px; height: 2px; transform: translateX(-50%); }
   .rail-tip { display: none; }
   .app-main { padding-bottom: calc(62px + env(safe-area-inset-bottom)); }
@@ -1143,7 +1138,10 @@ body.reduce-motion *::after {
   .composer-wrap { padding-left: 12px; padding-right: 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .composer-inner { border-radius: 21px; padding-left: 15px; }
   .composer-hint { display: none; }
-  .gesture-btn { height: 30px; font-size: 10.5px; }
+  .gesture-bar { flex-wrap: wrap; overflow-x: visible; gap: 5px; padding-bottom: 8px; }
+  .gesture-label { display: none; }
+  .gesture-btn { height: 29px; gap: 4px; padding: 0 9px; font-size: 10px; }
+  .gesture-btn svg { width: 13px; height: 13px; }
 
   .page-head { padding: 18px 16px 14px; }
   .page-head h2 { font-size: 22px; }

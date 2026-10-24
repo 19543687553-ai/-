@@ -96,8 +96,8 @@
 }
 .theme-swatch {
   position: relative;
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, .3);
   border-radius: 50%;
@@ -119,6 +119,43 @@
 .theme-swatch[data-theme-choice="dawn"] { --sw: linear-gradient(135deg, #e88566, #f6d7b8); }
 .theme-swatch[data-theme-choice="sakura"] { --sw: linear-gradient(135deg, #ffb3c7, #d8b4ff); }
 .theme-swatch[data-theme-choice="forest"] { --sw: linear-gradient(135deg, #a9d8ba, #e5c992); }
+
+/* 注册时的初始氛围选择 */
+.theme-pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.theme-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .04em;
+  transition: color var(--fast), border-color var(--fast), background var(--fast);
+}
+.theme-pick i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--sw);
+  border: 1px solid rgba(255, 255, 255, .28);
+}
+.theme-pick:hover { color: var(--text); border-color: var(--line-strong); }
+.theme-pick[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.theme-pick[data-theme-choice="dusk"] { --sw: linear-gradient(135deg, #ffaf9b, #c3abff); }
+.theme-pick[data-theme-choice="dawn"] { --sw: linear-gradient(135deg, #e88566, #f6d7b8); }
+.theme-pick[data-theme-choice="sakura"] { --sw: linear-gradient(135deg, #ffb3c7, #d8b4ff); }
+.theme-pick[data-theme-choice="forest"] { --sw: linear-gradient(135deg, #a9d8ba, #e5c992); }
 
 /* Hero */
 .auth-hero {
