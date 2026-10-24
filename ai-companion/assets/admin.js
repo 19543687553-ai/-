@@ -724,9 +724,14 @@
                   <input class="input" id="modelBase" type="text" placeholder="https://api.deepseek.com/v1" value="${esc(s.model_base || '')}">
                   <span class="field-hint">不含 /chat/completions，系统会自动补全</span>
                 </label>
-                <label class="field"><span class="field-label">模型名称</span>
-                  <input class="input" id="modelName" type="text" placeholder="deepseek-chat" value="${esc(s.model_name || '')}">
-                </label>
+                <div class="field">
+                  <span class="field-label">模型名称</span>
+                  <div class="input-row">
+                    <input class="input" id="modelName" type="text" placeholder="deepseek-chat" value="${esc(s.model_name || '')}" autocomplete="off">
+                    <button class="btn btn-ghost btn-sm" type="button" id="modelListBtn">${UI.icon('refresh', 14)}拉取模型</button>
+                  </div>
+                  <span class="field-hint">无需手输模型 ID，点击「拉取模型」从服务商获取并选择</span>
+                </div>
                 <label class="field"><span class="field-label">API Key <span class="field-hint">${s.model_key_set ? '已保存 ' + esc(s.model_key_masked) : '尚未设置'}</span></span>
                   <input class="input" id="modelKey" type="password" placeholder="${s.model_key_set ? '留空表示不修改' : 'sk-...'}" autocomplete="off">
                 </label>
@@ -778,6 +783,62 @@
     temp.addEventListener('input', () => { $('#tempValue').textContent = Number(temp.value).toFixed(2); });
     $('#modelForm').addEventListener('submit', saveModel);
     $('#modelTestBtn').addEventListener('click', testModel);
+    $('#modelListBtn').addEventListener('click', fetchModels);
+  }
+
+  async function fetchModels() {
+    const base = $('#modelBase').value.trim();
+    const key = $('#modelKey').value.trim();
+    if (!base) { UI.toast('请先填写接口地址 Base URL'); return; }
+    const button = $('#modelListBtn');
+    setBusy(button, true, '拉取中');
+    try {
+      const res = await api('adminModelList', { model_base: base, model_key: key }, { timeout: 40000 });
+      if (!res.models || !res.models.length) {
+        UI.toast('服务商没有返回可用模型，请检查接口地址或权限');
+        return;
+      }
+      showModelPicker(res.models);
+    } catch (err) {
+      UI.toast(err.message || '拉取模型失败', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  }
+
+  function showModelPicker(models) {
+    const rows = models.map((m) => `<button class="model-pick" type="button" data-model="${esc(m.id)}">
+        <span class="model-pick-id">${esc(m.id)}</span>
+        <small>${esc(m.owned_by || '可用')}</small>
+      </button>`).join('');
+    openModal({
+      title: '选择模型',
+      sub: `已拉取 ${models.length} 个模型，点击任意一项即可填入`,
+      width: 560,
+      html: `<div class="input-wrap model-search">${UI.icon('search', 15)}<input class="input" id="modelSearch" type="text" placeholder="搜索模型 ID" autocomplete="off"></div>
+        <div class="model-pick-list" id="modelPickList">${rows}</div>
+        <div class="form-note" id="modelPickEmpty" hidden>没有匹配的模型</div>`,
+      buttons: [{ label: '关闭', cls: 'btn-ghost' }]
+    });
+    const list = $('#modelPickList');
+    $('#modelSearch').addEventListener('input', (event) => {
+      const q = event.target.value.trim().toLowerCase();
+      let shown = 0;
+      list.querySelectorAll('.model-pick').forEach((el) => {
+        const hit = !q || el.dataset.model.toLowerCase().indexOf(q) !== -1;
+        el.hidden = !hit;
+        if (hit) shown++;
+      });
+      $('#modelPickEmpty').hidden = shown > 0;
+    });
+    list.addEventListener('click', (event) => {
+      const item = event.target.closest('.model-pick');
+      if (!item) return;
+      $('#modelName').value = item.dataset.model;
+      closeModal();
+      UI.toast('已填入模型：' + item.dataset.model, 'success');
+    });
+    setTimeout(() => { const input = $('#modelSearch'); if (input) input.focus(); }, 60);
   }
 
   function modelPayload() {

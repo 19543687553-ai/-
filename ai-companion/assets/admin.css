@@ -887,3 +887,47 @@
 @media (min-width: 1680px) {
   .admin-view { max-width: 1560px; margin: 0 auto; }
 }
+
+/* 拉取模型 */
+.input-row { display: flex; align-items: stretch; gap: 8px; }
+.input-row .input { flex: 1 1 auto; min-width: 0; }
+.input-row .btn { flex: 0 0 auto; white-space: nowrap; }
+.model-search { margin-bottom: 12px; }
+.model-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: min(48vh, 380px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.model-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-soft);
+  color: var(--text-soft);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.model-pick:hover {
+  border-color: var(--accent);
+  background: var(--panel-hover);
+  color: var(--text);
+}
+.model-pick-id { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-pick small { flex: 0 0 auto; color: var(--faint); font-family: var(--sans); font-size: 10.5px; }
+
+@media (max-width: 460px) {
+  .input-row { flex-direction: column; }
+  .input-row .btn { justify-content: center; width: 100%; }
+}

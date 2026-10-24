@@ -55,6 +55,7 @@ try {
         case 'adminSaveSettings':      lumi_action_admin_save_settings(); break;
         case 'adminModelSave':         lumi_action_admin_model_save(); break;
         case 'adminModelTest':         lumi_action_admin_model_test(); break;
+        case 'adminModelList':         lumi_action_admin_model_list(); break;
         case 'adminAnnouncements':     lumi_action_admin_announcements(); break;
         case 'adminAnnouncementSave':  lumi_action_admin_announcement_save(); break;
         case 'adminAnnouncementDelete':lumi_action_admin_announcement_delete(); break;
@@ -1478,6 +1479,33 @@ function lumi_action_admin_model_test(): void
         'latency' => $result['latency'],
         'model' => $result['model'] ?? $model,
     ], '连接成功，模型正在回应');
+}
+
+function lumi_action_admin_model_list(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin']);
+    $config = lumi_model_config();
+    $base = trim((string)lumi_param('model_base', $config['base']));
+    $key = (string)lumi_param('model_key', '');
+    if ($key === '' || mb_strpos($key, '•') !== false) {
+        $key = $config['key'];
+    }
+    if ($base === '' || !preg_match('#^https?://#i', $base)) {
+        lumi_err('请先填写以 http:// 或 https:// 开头的接口地址');
+    }
+    if ($key === '') {
+        lumi_err('请先填写 API Key，或先保存 Key 后再拉取');
+    }
+    $result = lumi_models_request($base, $key);
+    if (!$result['ok']) {
+        lumi_err($result['error'] ?: '拉取失败', 400);
+    }
+    lumi_audit($admin, 'model.list', 'settings', '', '拉取模型列表 ' . count($result['models']) . ' 个 @ ' . ($result['endpoint'] ?? $base));
+    lumi_ok([
+        'models' => $result['models'],
+        'count' => count($result['models']),
+        'endpoint' => $result['endpoint'] ?? '',
+    ]);
 }
 
 // =====================================================================

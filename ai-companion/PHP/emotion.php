@@ -327,6 +327,94 @@ function lumi_model_endpoint(string $base): string
     return $base . '/chat/completions';
 }
 
+function lumi_models_endpoint(string $base): string
+{
+    $base = rtrim(trim($base), '/');
+    if (preg_match('#/chat/completions$#i', $base)) {
+        return preg_replace('#/chat/completions$#i', '/models', $base);
+    }
+    if (preg_match('#/models$#i', $base)) {
+        return $base;
+    }
+    return $base . '/models';
+}
+
+/**
+ * 拉取服务商可用模型列表（OpenAI 兼容 GET /models）
+ */
+function lumi_models_request(string $base, string $key): array
+{
+    if ($base === '' || $key === '') {
+        return ['ok' => false, 'error' => '请先填写接口地址与 API Key'];
+    }
+    $endpoint = lumi_models_endpoint($base);
+    $ch = curl_init($endpoint);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPGET => true,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $key,
+        ],
+        CURLOPT_TIMEOUT => 25,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $raw = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false || $curlError !== '') {
+        lumi_log_model_error('models curl: ' . $curlError . ' endpoint=' . $endpoint);
+        return ['ok' => false, 'error' => '连接服务商失败，请检查接口地址或服务器网络', 'code' => 'network'];
+    }
+    if ($httpCode === 401 || $httpCode === 403) {
+        return ['ok' => false, 'error' => 'API Key 无效或没有读取模型列表的权限', 'code' => 'auth'];
+    }
+    if ($httpCode === 404) {
+        return ['ok' => false, 'error' => '该接口地址不支持 /models，请检查 Base URL 是否完整', 'code' => 'not_found'];
+    }
+    if ($httpCode < 200 || $httpCode >= 300) {
+        $snippet = mb_substr(trim((string)$raw), 0, 180);
+        lumi_log_model_error('models http ' . $httpCode . ' body=' . $snippet);
+        return ['ok' => false, 'error' => '服务商返回 HTTP ' . $httpCode . ($snippet !== '' ? '：' . $snippet : ''), 'code' => 'http'];
+    }
+
+    $json = json_decode((string)$raw, true);
+    if (!is_array($json)) {
+        return ['ok' => false, 'error' => '服务商返回的内容不是有效 JSON', 'code' => 'parse'];
+    }
+    $list = [];
+    if (isset($json['data']) && is_array($json['data'])) {
+        $list = $json['data'];
+    } elseif (isset($json['models']) && is_array($json['models'])) {
+        $list = $json['models'];
+    }
+    $models = [];
+    foreach ($list as $item) {
+        if (is_string($item)) {
+            $id = trim($item);
+            $owner = '';
+        } elseif (is_array($item)) {
+            $id = trim((string)($item['id'] ?? $item['name'] ?? ''));
+            $owner = trim((string)($item['owned_by'] ?? $item['owner'] ?? ''));
+        } else {
+            continue;
+        }
+        if ($id === '' || isset($models[$id])) {
+            continue;
+        }
+        $models[$id] = ['id' => $id, 'owned_by' => $owner];
+        if (count($models) >= 500) {
+            break;
+        }
+    }
+    $models = array_values($models);
+    usort($models, static fn(array $a, array $b): int => strcmp($a['id'], $b['id']));
+    return ['ok' => true, 'models' => $models, 'endpoint' => $endpoint];
+}
+
 function lumi_model_request(array $messages, array $override = []): array
 {
     $config = lumi_model_config();
