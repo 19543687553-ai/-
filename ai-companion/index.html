@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dusk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100d16">
+  <meta name="description" content="心屿，一个会记得你情绪、也会主动走向你的 AI 情感陪伴空间。">
+  <title>心屿 · 把心事交给一个懂你的人</title>
+  <link rel="stylesheet" href="assets/base.css">
+  <link rel="stylesheet" href="assets/auth.css">
+</head>
+<body class="auth-body">
+  <main class="auth-page">
+    <section class="auth-visual" aria-label="心屿产品介绍">
+      <div class="auth-visual-glow"></div>
+      <header class="auth-visual-head">
+        <a class="brand auth-brand" href="index.html" aria-label="心屿首页">
+          <span class="brand-mark" id="authBrandMark"></span>
+          <span class="brand-copy">
+            <span class="brand-name">心屿</span>
+            <span class="brand-en">SOULISLE</span>
+          </span>
+        </a>
+        <div class="theme-dock" role="group" aria-label="选择界面氛围">
+          <span class="theme-dock-label">氛围</span>
+          <button class="theme-swatch" data-theme-choice="dusk" type="button" aria-label="暮色氛围" title="暮色"></button>
+          <button class="theme-swatch" data-theme-choice="dawn" type="button" aria-label="晨雾氛围" title="晨雾"></button>
+          <button class="theme-swatch" data-theme-choice="sakura" type="button" aria-label="樱夜氛围" title="樱夜"></button>
+          <button class="theme-swatch" data-theme-choice="forest" type="button" aria-label="森语氛围" title="森语"></button>
+        </div>
+      </header>
+
+      <div class="auth-hero">
+        <div class="hero-kicker"><span class="hero-pulse"></span>一个会记得你情绪的陪伴空间</div>
+        <h1>把说不出口的心事，<br><em>交给一个懂你的人。</em></h1>
+        <p class="hero-lead">她不是永远正确的答案。她会有自己的小情绪，会在你沉默时主动开口，也会在你难过时，先抱抱你。</p>
+
+        <div class="hero-companion">
+          <div class="hero-avatar-wrap">
+            <div class="hero-avatar-halo"></div>
+            <img class="hero-avatar" src="assets/companion.jpg" alt="心屿的陪伴者小屿">
+            <span class="hero-status"><span class="status-dot"></span>正在等你</span>
+          </div>
+          <div class="hero-message">
+            <span class="hero-message-label">小屿 · 此刻</span>
+            <p>今天也辛苦了。先别急着一个人扛，好吗？</p>
+            <span class="hero-message-time">刚刚 · 心屿</span>
+          </div>
+        </div>
+
+        <div class="hero-quote">“被理解这件事，有时比答案更重要。”</div>
+      </div>
+
+      <footer class="auth-visual-foot">
+        <span><i class="foot-dot"></i>私密陪伴</span>
+        <span><i class="foot-dot"></i>情绪记忆</span>
+        <span><i class="foot-dot"></i>主动关心</span>
+      </footer>
+    </section>
+
+    <section class="auth-side">
+      <div class="auth-card">
+        <div class="auth-card-head">
+          <span class="eyebrow">WELCOME TO SOULISLE</span>
+          <h2 id="authTitle">欢迎回来</h2>
+          <p id="authSubtitle">小屿已经把窗边的灯点亮了。</p>
+        </div>
+
+        <div class="auth-tabs" role="tablist" aria-label="登录或注册">
+          <button class="auth-tab active" id="tabLogin" type="button" role="tab" aria-selected="true" aria-controls="panelLogin">登录</button>
+          <button class="auth-tab" id="tabRegister" type="button" role="tab" aria-selected="false" aria-controls="panelRegister">注册</button>
+          <span class="auth-tab-indicator" id="tabIndicator"></span>
+        </div>
+
+        <div class="auth-alert" id="authAlert" role="alert" aria-live="polite"></div>
+
+        <div class="auth-panel active" id="panelLogin" role="tabpanel" aria-labelledby="tabLogin">
+          <form id="loginForm" novalidate>
+            <div class="field">
+              <label class="field-label" for="loginUsername">你的名字</label>
+              <div class="input-wrap">
+                <span id="userIcon"></span>
+                <input class="input" id="loginUsername" name="username" autocomplete="username" placeholder="输入用户名" maxlength="20" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="loginPassword">密码</label>
+              <div class="input-wrap">
+                <span id="lockIcon"></span>
+                <input class="input" id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="输入密码" maxlength="72" required>
+                <button class="input-action" type="button" data-toggle-password="loginPassword" aria-label="显示密码"></button>
+              </div>
+            </div>
+            <div class="auth-form-row">
+              <label class="check-label">
+                <input type="checkbox" checked id="rememberMe">
+                <span class="check-box"></span>
+                <span>记住我</span>
+              </label>
+              <span class="faint" style="font-size:11px">登录状态保留 30 天</span>
+            </div>
+            <button class="btn btn-primary btn-block auth-submit" id="loginSubmit" type="submit">
+              <span>进入心屿</span>
+              <span id="loginArrow"></span>
+            </button>
+          </form>
+
+          <div class="auth-divider"><span>或</span></div>
+
+          <button class="demo-entry" id="demoBtn" type="button">
+            <span class="demo-avatar"><img src="assets/companion.jpg" alt=""></span>
+            <span class="demo-copy"><strong>第一次来？</strong><small>用体验账号看看，小屿已经留了一盏灯</small></span>
+            <span id="demoArrow"></span>
+          </button>
+        </div>
+
+        <div class="auth-panel" id="panelRegister" role="tabpanel" aria-labelledby="tabRegister">
+          <form id="registerForm" novalidate>
+            <div class="field">
+              <label class="field-label" for="regUsername">用户名 <span class="field-hint">2-20 位</span></label>
+              <div class="input-wrap">
+                <span id="regUserIcon"></span>
+                <input class="input" id="regUsername" name="username" autocomplete="username" placeholder="只属于你的名字" maxlength="20" required>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="regNickname">希望她怎么称呼你</label>
+              <div class="input-wrap">
+                <span id="regHeartIcon"></span>
+                <input class="input" id="regNickname" name="nickname" autocomplete="nickname" placeholder="例如：晚晚" maxlength="20">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="regPassword">设置密码 <span class="field-hint">至少 6 位</span></label>
+              <div class="input-wrap">
+                <span id="regLockIcon"></span>
+                <input class="input" id="regPassword" name="password" type="password" autocomplete="new-password" placeholder="给这里上一把温柔的锁" minlength="6" maxlength="72" required>
+                <button class="input-action" type="button" data-toggle-password="regPassword" aria-label="显示密码"></button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="regPassword2">再确认一次</label>
+              <div class="input-wrap">
+                <span id="regCheckIcon"></span>
+                <input class="input" id="regPassword2" name="password2" type="password" autocomplete="new-password" placeholder="再输入一次密码" maxlength="72" required>
+              </div>
+            </div>
+            <label class="check-label terms">
+              <input type="checkbox" id="agreeTerms">
+              <span class="check-box"></span>
+              <span>我愿意遵守陪伴协议，并尊重这里是一个私密、温柔的空间</span>
+            </label>
+            <button class="btn btn-primary btn-block auth-submit" id="registerSubmit" type="submit">
+              <span>创建我的陪伴空间</span>
+              <span id="registerArrow"></span>
+            </button>
+          </form>
+        </div>
+
+        <div class="auth-meta">
+          <span class="server-state" id="serverState"><i></i><span>正在连接心屿</span></span>
+          <a href="admin.html" class="admin-link">管理入口</a>
+        </div>
+      </div>
+      <p class="auth-legal">心屿是一个情绪陪伴产品，不替代专业医疗或心理干预。若你正处于危险中，请优先联系身边可信任的人或当地紧急服务。</p>
+    </section>
+  </main>
+
+  <div class="ban-modal" id="banModal" role="dialog" aria-modal="true" aria-labelledby="banTitle">
+    <div class="ban-card">
+      <div class="ban-icon" id="banIcon"></div>
+      <h2 id="banTitle">这里暂时为你关上了门</h2>
+      <p id="banLead">出于社区与安全规则，你的账号被暂停使用。这不是告别，门会在约定时间重新打开。</p>
+      <div class="ban-detail">
+        <div class="ban-row"><span>封禁原因</span><strong class="reason" id="banReason">—</strong></div>
+        <div class="ban-row"><span>封禁时间</span><strong id="banStart">—</strong></div>
+        <div class="ban-row"><span>解封时间</span><strong id="banUntil">—</strong></div>
+        <div class="ban-row"><span>处理编号</span><strong id="banCode">—</strong></div>
+      </div>
+      <div class="ban-countdown" id="banCountdownWrap"><span>距离重新见面还有</span><b id="banCountdown">—</b></div>
+      <div class="ban-actions">
+        <button class="btn btn-primary" id="banLogout" type="button">退出账号</button>
+        <button class="btn btn-ghost" id="banCopyContact" type="button"><span id="banMailIcon"></span>联系主理人</button>
+      </div>
+      <p class="ban-foot">如果你认为这是一次误判，请带着用户名与解封时间联系管理员。心屿会认真复核每一次处理。</p>
+    </div>
+  </div>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/api.js"></script>
+  <script src="assets/auth.js"></script>
+</body>
+</html>

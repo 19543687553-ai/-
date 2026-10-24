@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dusk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#100d16">
+<title>心屿 · 控制台</title>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/admin.css">
+</head>
+<body class="admin-body">
+
+<!-- ==================== 后台登录 ==================== -->
+<div class="admin-login" id="adminLogin">
+  <div class="login-art">
+    <div class="art-grid" aria-hidden="true"></div>
+    <div class="login-brand">
+      <span class="brand-mark" data-icon="logo"></span>
+      <span class="brand-copy">
+        <strong class="brand-name">心屿</strong>
+        <span class="brand-en">CONTROL ROOM</span>
+      </span>
+    </div>
+    <div class="art-copy">
+      <p class="eyebrow">EMOTIONAL COMPANION · OPERATIONS</p>
+      <h1>看懂每一次<br><em>情绪起伏</em>。</h1>
+      <p>用户、对话、情绪曲线、模型与安全策略，都在同一间控制室里。你掌握节奏，她负责温柔。</p>
+    </div>
+    <div class="art-metrics">
+      <div><span>实时</span><b>情绪曲线</b></div>
+      <div><span>秒级</span><b>封禁控制</b></div>
+      <div><span>加密</span><b>模型 Key</b></div>
+    </div>
+    <div class="art-foot">心屿 · 情感陪伴机器人管理后台 v1.0</div>
+  </div>
+
+  <div class="login-panel">
+    <form class="login-card" id="adminLoginForm" autocomplete="off" novalidate>
+      <div class="login-head">
+        <span class="login-badge"><span data-icon="lock"></span></span>
+        <h2>进入控制台</h2>
+        <p>仅限授权运营人员访问</p>
+      </div>
+      <div class="login-alert" id="loginAlert" hidden></div>
+      <label class="field">
+        <span class="field-label">后台账号</span>
+        <span class="input-wrap">
+          <span data-icon="user"></span>
+          <input class="input" id="adminUsername" type="text" placeholder="请输入管理员账号" autocomplete="username" required>
+        </span>
+      </label>
+      <label class="field">
+        <span class="field-label">登录密码</span>
+        <span class="input-wrap">
+          <span data-icon="key"></span>
+          <input class="input" id="adminPassword" type="password" placeholder="请输入密码" autocomplete="current-password" required>
+          <button class="input-action" type="button" data-toggle-password="adminPassword" aria-label="显示密码"><span data-icon="eye"></span></button>
+        </span>
+      </label>
+      <button class="btn btn-primary btn-block login-submit" id="adminLoginBtn" type="submit">
+        <span>安全登录</span><span data-icon="chevronRight"></span>
+      </button>
+      <div class="login-foot">
+        <span class="login-state" id="adminServerState"><i class="status-dot"></i><span>正在检测服务</span></span>
+        <a class="login-link" href="index.html">返回前台 <span data-icon="external"></span></a>
+      </div>
+      <p class="login-hint">初始账号 admin / Lumi@2026，登录后请及时在「管理员」中修改密码。</p>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== 后台主体 ==================== -->
+<div class="admin-shell" id="adminShell" hidden>
+  <aside class="admin-side" id="adminSide">
+    <div class="side-brand">
+      <span class="brand-mark" data-icon="logo"></span>
+      <span class="brand-copy">
+        <strong class="brand-name">心屿</strong>
+        <span class="brand-en">CONTROL ROOM</span>
+      </span>
+      <button class="side-collapse" id="sideCollapse" aria-label="收起侧栏"><span data-icon="chevronRight"></span></button>
+    </div>
+
+    <nav class="side-nav" id="sideNav">
+      <div class="nav-group">
+        <p class="nav-label">运营</p>
+        <button class="nav-item" data-view="dashboard"><span data-icon="grid"></span><span class="nav-text">数据总览</span></button>
+        <button class="nav-item" data-view="users"><span data-icon="users"></span><span class="nav-text">用户管理</span><span class="nav-badge" id="badgeBanned" hidden></span></button>
+        <button class="nav-item" data-view="conversations"><span data-icon="message"></span><span class="nav-text">对话记录</span></button>
+        <button class="nav-item" data-view="messages"><span data-icon="chat"></span><span class="nav-text">消息检索</span></button>
+        <button class="nav-item" data-view="moods"><span data-icon="pulse"></span><span class="nav-text">情绪洞察</span></button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-label">配置</p>
+        <button class="nav-item" data-view="model"><span data-icon="bot"></span><span class="nav-text">模型与 Key</span><span class="nav-dot" id="modelDot"></span></button>
+        <button class="nav-item" data-view="settings"><span data-icon="settings"></span><span class="nav-text">系统设置</span></button>
+        <button class="nav-item" data-view="announcements"><span data-icon="megaphone"></span><span class="nav-text">公告管理</span></button>
+        <button class="nav-item" data-view="words"><span data-icon="shield"></span><span class="nav-text">安全词库</span></button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-label">服务</p>
+        <button class="nav-item" data-view="feedbacks"><span data-icon="quote"></span><span class="nav-text">反馈工单</span><span class="nav-badge" id="badgeFeedback" hidden></span></button>
+        <button class="nav-item" data-view="admins" data-role="superadmin"><span data-icon="crown"></span><span class="nav-text">管理员</span></button>
+        <button class="nav-item" data-view="audit"><span data-icon="activity"></span><span class="nav-text">审计日志</span></button>
+        <button class="nav-item" data-view="tools"><span data-icon="database"></span><span class="nav-text">数据工具</span></button>
+      </div>
+    </nav>
+
+    <div class="side-foot">
+      <div class="side-admin">
+        <span class="admin-avatar" id="adminAvatar">屿</span>
+        <span class="admin-copy">
+          <strong id="adminName">主理人</strong>
+          <span id="adminRole">超级管理员</span>
+        </span>
+        <button class="btn btn-icon btn-sm" id="adminLogout" aria-label="退出后台"><span data-icon="logout"></span></button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="admin-main">
+    <header class="admin-top">
+      <button class="top-menu" id="topMenu" aria-label="打开菜单"><span data-icon="menu"></span></button>
+      <div class="top-copy">
+        <h1 id="pageTitle">数据总览</h1>
+        <p id="pageSub">今天的陪伴正在发生</p>
+      </div>
+      <div class="top-actions">
+        <span class="top-chip" id="modelChip"><i class="status-dot"></i><span>模型状态</span></span>
+        <button class="top-btn" id="btnRefresh" aria-label="刷新数据"><span data-icon="refresh"></span><span class="top-btn-text">刷新</span></button>
+        <a class="top-btn" href="index.html" target="_blank" rel="noopener"><span data-icon="external"></span><span class="top-btn-text">前台</span></a>
+      </div>
+    </header>
+
+    <main class="admin-content" id="adminContent">
+      <section class="admin-view" data-view="dashboard"></section>
+      <section class="admin-view" data-view="users"></section>
+      <section class="admin-view" data-view="conversations"></section>
+      <section class="admin-view" data-view="messages"></section>
+      <section class="admin-view" data-view="moods"></section>
+      <section class="admin-view" data-view="model"></section>
+      <section class="admin-view" data-view="settings"></section>
+      <section class="admin-view" data-view="announcements"></section>
+      <section class="admin-view" data-view="words"></section>
+      <section class="admin-view" data-view="feedbacks"></section>
+      <section class="admin-view" data-view="admins"></section>
+      <section class="admin-view" data-view="audit"></section>
+      <section class="admin-view" data-view="tools"></section>
+    </main>
+  </div>
+  <div class="side-mask" id="sideMask"></div>
+</div>
+
+<!-- 通用弹窗 -->
+<div class="modal-backdrop" id="adminModal" aria-hidden="true">
+  <div class="modal-panel admin-modal-panel" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <h3 id="modalTitle">标题</h3>
+        <p id="modalSub"></p>
+      </div>
+      <button class="modal-close" id="modalClose" aria-label="关闭"><span data-icon="x"></span></button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<!-- 用户详情抽屉 -->
+<div class="drawer-mask" id="drawerMask"></div>
+<aside class="admin-drawer" id="adminDrawer" aria-hidden="true">
+  <header class="drawer-head">
+    <div class="drawer-id">
+      <span class="drawer-avatar" id="drawerAvatar">晚</span>
+      <div>
+        <h2 id="drawerName">用户详情</h2>
+        <p id="drawerMeta"></p>
+      </div>
+    </div>
+    <button class="modal-close" id="drawerClose" aria-label="关闭"><span data-icon="x"></span></button>
+  </header>
+  <div class="drawer-tabs" id="drawerTabs"></div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <footer class="drawer-foot" id="drawerFoot"></footer>
+</aside>
+
+<script src="assets/config.js"></script>
+<script src="assets/api.js"></script>
+<script src="assets/admin.js"></script>
+</body>
+</html>

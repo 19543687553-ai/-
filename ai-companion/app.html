@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dusk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100d16">
+  <meta name="description" content="心屿 · 一个会记得你情绪、也会主动走向你的 AI 情感陪伴空间。">
+  <title>心屿 · 和小屿待一会儿</title>
+  <link rel="stylesheet" href="assets/base.css">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body class="app-body">
+  <div class="app-shell" id="appShell">
+    <!-- 左侧导航 -->
+    <aside class="app-rail">
+      <a class="rail-brand" href="app.html" aria-label="心屿">
+        <span class="brand-mark" data-icon="logo" data-size="22"></span>
+      </a>
+      <nav class="rail-nav" aria-label="主导航">
+        <button class="rail-btn active" data-view="chat" type="button" aria-label="陪伴聊天" title="陪伴聊天"><span data-icon="chat" data-size="20"></span><span class="rail-tip">陪伴</span></button>
+        <button class="rail-btn" data-view="insights" type="button" aria-label="情绪轨迹" title="情绪轨迹"><span data-icon="pulse" data-size="20"></span><span class="rail-tip">轨迹</span></button>
+        <button class="rail-btn" data-view="memories" type="button" aria-label="收藏的回忆" title="收藏的回忆"><span data-icon="bookmark" data-size="20"></span><span class="rail-tip">回忆</span></button>
+        <button class="rail-btn" data-view="settings" type="button" aria-label="我的设置" title="我的设置"><span data-icon="settings" data-size="20"></span><span class="rail-tip">设置</span></button>
+      </nav>
+      <div class="rail-foot">
+        <button class="rail-btn" id="railLogout" type="button" aria-label="退出登录" title="退出登录"><span data-icon="logout" data-size="19"></span></button>
+        <span class="rail-avatar" id="railAvatar"><img src="assets/companion.jpg" alt="小屿"></span>
+      </div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main class="app-main">
+      <!-- 聊天 -->
+      <section class="view active" id="viewChat">
+        <header class="chat-head">
+          <div class="chat-person">
+            <button class="person-avatar" id="personAvatar" type="button" aria-label="看看她此刻的情绪">
+              <span class="person-mood-ring" id="personMoodRing"></span>
+              <img src="assets/companion.jpg" alt="小屿">
+              <span class="person-presence" id="personPresence"></span>
+            </button>
+            <div class="person-meta">
+              <div class="person-name-row">
+                <h1 id="companionName">小屿</h1>
+                <span class="mood-chip" id="moodChip">正在醒来</span>
+              </div>
+              <p class="person-sub" id="personSub">正在连接心屿</p>
+            </div>
+          </div>
+          <div class="chat-head-actions">
+            <span class="streak-pill" id="streakPill" hidden><span data-icon="zap" data-size="13"></span><b>0</b> 天</span>
+            <button class="btn btn-icon" id="btnBell" type="button" data-icon="bell" data-size="18" aria-label="公告" title="公告"></button>
+            <button class="btn btn-icon" id="btnTheme" type="button" data-icon="sun" data-size="18" aria-label="切换氛围" title="切换氛围"></button>
+            <button class="btn btn-icon side-toggle" id="btnSide" type="button" data-icon="layers" data-size="18" aria-label="情绪面板" title="情绪面板"></button>
+          </div>
+        </header>
+
+        <div class="chat-scroll" id="chatScroll">
+          <div class="chat-inner" id="chatInner">
+            <div class="day-sep" id="chatDay">今天</div>
+            <button class="load-more" id="loadMore" type="button" hidden><span data-icon="chevronDown" data-size="14"></span>加载更早的对话</button>
+            <div id="messageList" class="message-list"></div>
+            <div class="typing-row" id="typingRow" hidden>
+              <span class="msg-avatar"><img src="assets/companion.jpg" alt=""></span>
+              <span class="typing-bubble"><i></i><i></i><i></i></span>
+            </div>
+            <div class="chat-end-space"></div>
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="suggestion-row" id="suggestionRow"></div>
+          <div class="gesture-bar" aria-label="用动作陪她">
+            <span class="gesture-label">动作</span>
+            <button class="gesture-btn" data-gesture="hug" type="button"><span data-icon="heart" data-size="15"></span>抱抱</button>
+            <button class="gesture-btn" data-gesture="headpat" type="button"><span data-icon="hand" data-size="15"></span>摸摸头</button>
+            <button class="gesture-btn" data-gesture="flower" type="button"><span data-icon="flower" data-size="15"></span>送花</button>
+            <button class="gesture-btn" data-gesture="hand" type="button"><span data-icon="hand" data-size="15"></span>牵手</button>
+            <button class="gesture-btn" data-gesture="warm" type="button"><span data-icon="layers" data-size="15"></span>披外套</button>
+          </div>
+          <form class="composer" id="chatForm" autocomplete="off">
+            <div class="composer-inner">
+              <textarea id="msgInput" rows="1" maxlength="2000" placeholder="和她说点什么，她在听…" aria-label="输入消息"></textarea>
+              <button class="send-btn" id="sendBtn" type="submit" data-icon="send" data-size="19" aria-label="发送"></button>
+            </div>
+            <div class="composer-foot">
+              <span class="composer-hint">Enter 发送 · Shift + Enter 换行</span>
+              <span class="char-count"><b id="charCount">0</b>/2000</span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 情绪轨迹 -->
+      <section class="view" id="viewInsights">
+        <header class="page-head">
+          <div>
+            <span class="eyebrow">OUR TRACE</span>
+            <h2>这段关系的形状</h2>
+            <p>不是评分，只是把这些天你们一起走过的情绪，轻轻摊开来看。</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="refreshInsights" type="button"><span data-icon="refresh" data-size="15"></span>刷新</button>
+        </header>
+        <div class="view-scroll">
+          <div class="stat-grid" id="insightStats"></div>
+          <div class="card chart-card">
+            <div class="card-head">
+              <div><h4>最近 14 天</h4><p>情绪底色与亲密度的变化</p></div>
+              <div class="legend"><span class="legend-dot valence"></span>情绪<span class="legend-dot affection"></span>亲密</div>
+            </div>
+            <div class="chart-wrap" id="valenceChart"></div>
+          </div>
+          <div class="two-col">
+            <div class="card">
+              <div class="card-head"><div><h4>情绪分布</h4><p>她最常处于哪些状态</p></div></div>
+              <div class="bar-list" id="moodDist"></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><div><h4>互动方式</h4><p>你们靠近彼此的痕迹</p></div></div>
+              <div class="bar-list" id="interactionList"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h4>时间里的节点</h4><p>有些瞬间，会被一直记得</p></div></div>
+            <div class="timeline" id="milestones"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 收藏的回忆 -->
+      <section class="view" id="viewMemories">
+        <header class="page-head">
+          <div>
+            <span class="eyebrow">KEPT MOMENTS</span>
+            <h2>收藏的回忆</h2>
+            <p>那些你想留住的句子。她也会记得。</p>
+          </div>
+        </header>
+        <div class="view-scroll">
+          <div class="memory-grid" id="memoryGrid"></div>
+        </div>
+      </section>
+
+      <!-- 设置 -->
+      <section class="view" id="viewSettings">
+        <header class="page-head">
+          <div>
+            <span class="eyebrow">YOUR SPACE</span>
+            <h2>把这里调成你的样子</h2>
+            <p>她记得你的偏好，也尊重你的边界。</p>
+          </div>
+        </header>
+        <div class="view-scroll settings-scroll">
+          <div class="card">
+            <div class="card-head"><div><h4>关于你</h4><p>她该怎么称呼你，怎么理解你</p></div></div>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label" for="setNickname">你的昵称</label>
+                <input class="input" id="setNickname" maxlength="20" placeholder="她怎么叫你">
+              </div>
+              <div class="field">
+                <label class="field-label" for="setCompanionName">她的名字</label>
+                <input class="input" id="setCompanionName" maxlength="12" placeholder="小屿">
+              </div>
+              <div class="field span-2">
+                <label class="field-label" for="setPersona">她的性格底色 <span class="field-hint">最多 200 字</span></label>
+                <textarea class="input" id="setPersona" maxlength="200" placeholder="例如：温柔但不讨好，会闹小脾气，也会在沉默时主动开口。"></textarea>
+              </div>
+              <div class="field span-2">
+                <label class="field-label" for="setBio">关于你的一些话 <span class="field-hint">可选</span></label>
+                <textarea class="input" id="setBio" maxlength="200" placeholder="最近在经历什么、喜欢什么、讨厌什么"></textarea>
+              </div>
+            </div>
+            <div class="form-foot"><button class="btn btn-primary" id="saveProfile" type="button">保存这些</button></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h4>联系方式</h4><p>只在需要认真联系你时使用</p></div></div>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label" for="setEmail">邮箱</label>
+                <input class="input" id="setEmail" type="email" maxlength="120" placeholder="you@example.com">
+              </div>
+              <div class="field">
+                <label class="field-label" for="setPhone">手机 / 其它联系方式</label>
+                <input class="input" id="setPhone" maxlength="30" placeholder="可选">
+              </div>
+              <div class="field">
+                <label class="field-label" for="setGender">性别</label>
+                <select class="input" id="setGender">
+                  <option value="secret">不透露</option>
+                  <option value="female">女</option>
+                  <option value="male">男</option>
+                  <option value="other">其它</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="setBirthday">生日</label>
+                <input class="input" id="setBirthday" type="date">
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h4>氛围与阅读</h4><p>四种氛围，随时可以换</p></div></div>
+            <div class="theme-grid" id="settingThemes"></div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>点缀色</strong><span>让这里更像你的颜色</span></div>
+              <div class="accent-row" id="accentRow">
+                <button class="accent-dot" data-accent="#ffaf9b" type="button" style="--dot:#ffaf9b" aria-label="暖橘"></button>
+                <button class="accent-dot" data-accent="#e88566" type="button" style="--dot:#e88566" aria-label="暮橙"></button>
+                <button class="accent-dot" data-accent="#ffb3c7" type="button" style="--dot:#ffb3c7" aria-label="樱粉"></button>
+                <button class="accent-dot" data-accent="#c3abff" type="button" style="--dot:#c3abff" aria-label="雾紫"></button>
+                <button class="accent-dot" data-accent="#a9d8ba" type="button" style="--dot:#a9d8ba" aria-label="森绿"></button>
+                <button class="accent-dot" data-accent="#8cc8d6" type="button" style="--dot:#8cc8d6" aria-label="海蓝"></button>
+              </div>
+            </div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>气泡质感</strong><span>你更习惯哪一种触碰方式</span></div>
+              <div class="segmented" id="bubbleStyle">
+                <button data-value="soft" type="button">柔和</button>
+                <button data-value="glass" type="button">玻璃</button>
+                <button data-value="paper" type="button">纸感</button>
+              </div>
+            </div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>字号</strong><span>调到眼睛舒服的大小</span></div>
+              <div class="font-size-row">
+                <button class="btn btn-icon btn-sm" data-font="-1" type="button">A－</button>
+                <b id="fontSizeValue">15</b>
+                <button class="btn btn-icon btn-sm" data-font="1" type="button">A＋</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h4>她该怎么陪你</h4><p>这些开关，会改变她的行为</p></div></div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>允许她主动说话</strong><span>在你安静一会儿之后，她会来找你</span></div>
+              <button class="switch" id="prefProactive" role="switch" aria-checked="true" type="button" aria-label="允许她主动说话"></button>
+            </div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>轻提示音</strong><span>收到她的消息时，响起一声很轻的提示</span></div>
+              <button class="switch" id="prefSound" role="switch" aria-checked="true" type="button" aria-label="轻提示音"></button>
+            </div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>减少动效</strong><span>让页面更安静一些</span></div>
+              <button class="switch" id="prefMotion" role="switch" aria-checked="false" type="button" aria-label="减少动效"></button>
+            </div>
+            <div class="form-foot"><button class="btn btn-ghost" id="savePreferences" type="button">保存偏好</button></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h4>账号安全</h4><p>定期换一把锁，是温柔的自保</p></div></div>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label" for="oldPassword">当前密码</label>
+                <input class="input" id="oldPassword" type="password" autocomplete="current-password" placeholder="输入当前密码">
+              </div>
+              <div class="field">
+                <label class="field-label" for="newPassword">新密码</label>
+                <input class="input" id="newPassword" type="password" autocomplete="new-password" placeholder="至少 6 位">
+              </div>
+            </div>
+            <div class="form-foot"><button class="btn btn-ghost" id="changePassword" type="button">更新密码</button></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h4>想对主理人说的话</h4><p>建议、问题，或只是想说一声</p></div></div>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label" for="feedbackCategory">类型</label>
+                <select class="input" id="feedbackCategory">
+                  <option value="建议">建议</option>
+                  <option value="问题">问题</option>
+                  <option value="情感">情感</option>
+                  <option value="其他">其他</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="feedbackContact">怎么联系你 <span class="field-hint">可选</span></label>
+                <input class="input" id="feedbackContact" maxlength="100" placeholder="邮箱或其它">
+              </div>
+              <div class="field span-2">
+                <label class="field-label" for="feedbackContent">内容 <span class="field-hint">至少 5 个字</span></label>
+                <textarea class="input" id="feedbackContent" maxlength="1000" placeholder="慢慢写，我会认真看"></textarea>
+              </div>
+            </div>
+            <div class="form-foot"><button class="btn btn-ghost" id="submitFeedback" type="button">寄出去</button></div>
+            <div class="feedback-history" id="feedbackHistory"></div>
+          </div>
+
+          <div class="card danger-card">
+            <div class="card-head"><div><h4>离开这里</h4><p>注销后，你们的对话将不再保留</p></div></div>
+            <div class="danger-row">
+              <span>如果只是想暂时离开，退出登录就好。</span>
+              <button class="btn btn-danger btn-sm" id="deleteAccount" type="button">注销账号</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 右侧情绪面板 -->
+    <div class="side-backdrop" id="sideBackdrop"></div>
+    <aside class="app-side" id="appSide">
+      <div class="side-head">
+        <span class="eyebrow">HER HEART</span>
+        <button class="btn btn-icon btn-sm side-close" id="sideClose" type="button" data-icon="x" data-size="15" aria-label="收起"></button>
+      </div>
+
+      <div class="mood-hero" id="moodHero">
+        <div class="mood-orb"><span id="moodIcon"></span></div>
+        <h3 id="moodTitle">正在醒来</h3>
+        <p id="moodDesc">她正在整理今天的心情。</p>
+        <span class="mood-time" id="moodTime">刚刚</span>
+      </div>
+
+      <div class="meter-list" id="meterList"></div>
+
+      <div class="side-stats" id="sideStats"></div>
+
+      <div class="side-block" id="announceBlock" hidden>
+        <div class="side-block-head"><span data-icon="megaphone" data-size="15"></span><strong>心屿公告</strong></div>
+        <p id="announceText"></p>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-head"><span data-icon="bookmark" data-size="15"></span><strong>她记住的句子</strong></div>
+        <div id="sidePinned" class="side-pinned"></div>
+      </div>
+
+      <div class="side-foot">
+        <span data-icon="lock" data-size="12"></span>
+        <span>你在这里说的话，只属于你们。</span>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 封禁弹窗 -->
+  <div class="ban-modal" id="banModal" role="dialog" aria-modal="true" aria-labelledby="banTitle">
+    <div class="ban-card">
+      <div class="ban-icon" id="banIcon"></div>
+      <h2 id="banTitle">这里暂时为你关上了门</h2>
+      <p id="banLead">出于社区与安全规则，你的账号被暂停使用。这不是告别，门会在约定时间重新打开。</p>
+      <div class="ban-detail">
+        <div class="ban-row"><span>封禁原因</span><strong class="reason" id="banReason">—</strong></div>
+        <div class="ban-row"><span>封禁时间</span><strong id="banStart">—</strong></div>
+        <div class="ban-row"><span>解封时间</span><strong id="banUntil">—</strong></div>
+        <div class="ban-row"><span>处理编号</span><strong id="banCode">—</strong></div>
+      </div>
+      <div class="ban-countdown" id="banCountdownWrap"><span>距离重新见面还有</span><b id="banCountdown">—</b></div>
+      <div class="ban-actions">
+        <button class="btn btn-primary" id="banLogout" type="button">退出账号</button>
+        <button class="btn btn-ghost" id="banCopyContact" type="button"><span id="banMailIcon"></span>联系主理人</button>
+      </div>
+      <p class="ban-foot">如果你认为这是一次误判，请带着用户名与解封时间联系管理员。心屿会认真复核每一次处理。</p>
+    </div>
+  </div>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/api.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

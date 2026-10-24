@@ -1,0 +1,9 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^data/ - [F,L]
+    RewriteRule ^\.app_secret$ - [F,L]
+</IfModule>
+<FilesMatch "^(companion\.sqlite|\.app_secret|.*\.log)$">
+    Require all denied
+</FilesMatch>
