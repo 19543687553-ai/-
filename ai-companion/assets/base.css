@@ -159,11 +159,18 @@
 
 [hidden] { display: none !important; }
 
-html { min-height: 100%; }
+html {
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: pan-x pan-y;
+}
 
 body {
   margin: 0;
   min-height: 100vh;
+  touch-action: pan-x pan-y;
+  -webkit-tap-highlight-color: transparent;
   font-family: var(--sans);
   background-color: var(--bg);
   color: var(--text);
@@ -644,4 +651,33 @@ h1, h2, h3, h4, p { margin: 0; }
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite linear;
   border-radius: 8px;
+}
+
+/* =========================================================
+   多设备适配
+   ========================================================= */
+/* 窄屏：输入控件字号不低于 16px，避免移动端聚焦时自动放大 */
+@media (max-width: 760px) {
+  input, textarea, select { font-size: 16px !important; }
+  .btn, button { touch-action: manipulation; }
+}
+
+/* 触屏设备（含横屏手机、平板）：同样锁定 16px，避免聚焦缩放 */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: 16px !important; }
+}
+
+/* 小屏手机：收紧全局间距 */
+@media (max-width: 380px) {
+  :root { --radius-lg: 22px; --radius-xl: 28px; }
+}
+
+/* 横屏手机：降低纵向留白，保证内容不被裁切 */
+@media (max-height: 520px) and (orientation: landscape) {
+  .modal-panel { max-height: 92vh; }
+}
+
+/* 大屏与 2K/4K：放大阅读字号，避免画面过空 */
+@media (min-width: 1680px) {
+  .app-body { --chat-size: 15.5px; }
 }

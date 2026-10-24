@@ -4,6 +4,7 @@
 .app-body {
   height: 100vh;
   height: 100svh;
+  height: 100dvh;
   overflow: hidden;
   --chat-size: 14.5px;
   --mood-a: #ffaf9b;
@@ -13,12 +14,16 @@
 .app-shell {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr) 322px;
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
 }
 
 /* ---------------- 左侧导航 ---------------- */
 .app-rail {
   position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
   z-index: 30;
   display: flex;
   flex-direction: column;
@@ -30,6 +35,7 @@
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
 }
+.app-rail::-webkit-scrollbar { display: none; }
 .rail-brand { display: inline-flex; }
 .rail-brand .brand-mark {
   width: 44px;
@@ -1161,4 +1167,26 @@ body.reduce-motion *::after {
   .composer textarea { font-size: 14px; }
   .stat-grid { gap: 9px; }
   .stat-card strong { font-size: 22px; }
+}
+
+/* 大屏：加宽阅读区与侧栏，保持舒适行宽 */
+@media (min-width: 1680px) {
+  .app-shell { grid-template-columns: 96px minmax(0, 1fr) 372px; }
+  .chat-inner, .composer-wrap > * { max-width: 1040px; }
+  .msg-col { max-width: min(74%, 700px); }
+}
+
+/* 手机横屏 / 小高度：压缩导航与头部，保证输入区始终在首屏 */
+@media (max-height: 560px) and (orientation: landscape) {
+  .app-rail { padding: 6px 8px; gap: 8px; }
+  .rail-brand { display: none; }
+  .rail-nav { padding-top: 4px; gap: 5px; }
+  .rail-btn { width: 52px; height: 46px; }
+  .rail-foot { flex-direction: row; margin-top: 4px; gap: 4px; }
+  .rail-avatar { display: none; }
+  .chat-head { padding: 8px 14px; }
+  .person-avatar { width: 42px; height: 42px; }
+  .person-sub { display: none; }
+  .composer-wrap { padding-top: 0; padding-bottom: 8px; }
+  .gesture-bar { padding-bottom: 6px; }
 }

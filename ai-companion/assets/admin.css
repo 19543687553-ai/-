@@ -8,6 +8,7 @@
     radial-gradient(900px 520px at -10% 10%, var(--glow-a), transparent 55%),
     var(--bg);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -880,4 +881,9 @@
   .stat-card b { font-size: 21px; }
   .toolbar { padding: 11px 12px; }
   .drawer-body { padding: 16px; }
+}
+
+/* 大屏：内容居中限宽，避免表格与表单被拉得过散 */
+@media (min-width: 1680px) {
+  .admin-view { max-width: 1560px; margin: 0 auto; }
 }

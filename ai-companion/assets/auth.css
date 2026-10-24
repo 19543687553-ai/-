@@ -2,7 +2,8 @@
    心屿 · 登录 / 注册
    ========================================================= */
 .auth-body {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--bg-3);
 }
 
@@ -11,6 +12,7 @@
   grid-template-columns: minmax(0, 1.06fr) minmax(430px, .94fr);
   min-height: 100vh;
   min-height: 100svh;
+  min-height: 100dvh;
 }
 
 /* ---------------- 左侧视觉 ---------------- */
