@@ -105,7 +105,10 @@
             <h2>这段关系的形状</h2>
             <p>不是评分，只是把这些天你们一起走过的情绪，轻轻摊开来看。</p>
           </div>
-          <button class="btn btn-ghost btn-sm" id="refreshInsights" type="button"><span data-icon="refresh" data-size="15"></span>刷新</button>
+          <div class="page-head-actions">
+            <button class="btn btn-ghost btn-sm" id="weeklyReport" type="button"><span data-icon="chart" data-size="15"></span>本周回顾</button>
+            <button class="btn btn-ghost btn-sm" id="refreshInsights" type="button"><span data-icon="refresh" data-size="15"></span>刷新</button>
+          </div>
         </header>
         <div class="view-scroll">
           <div class="card checkin-card">
@@ -391,6 +394,18 @@
         <button class="btn btn-primary btn-sm" id="searchGo" type="button">搜索</button>
       </div>
       <div class="search-results" id="searchResults"></div>
+    </div>
+  </div>
+
+  <!-- 周报弹窗 -->
+  <div class="modal-backdrop" id="reportModal">
+    <div class="modal-panel report-panel" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+      <div class="modal-head">
+        <div><h3 id="reportTitle">这一周，你们走过的地方</h3><p id="reportRange">近 7 天</p></div>
+        <button class="modal-close" id="reportClose" type="button" aria-label="关闭" data-icon="x" data-size="17"></button>
+      </div>
+      <div class="report-body" id="reportBody"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" id="reportDone" type="button">收好这一页</button></div>
     </div>
   </div>
 

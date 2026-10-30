@@ -11,8 +11,8 @@
 
   const ROLE_TEXT = { superadmin: '超级管理员', admin: '管理员', moderator: '审核员' };
   const STATUS_TEXT = { active: '正常', banned: '封禁中', deleted: '已注销' };
-  const THEME_TEXT = { dusk: '暮色', dawn: '晨雾', sakura: '樱夜', forest: '森语', midnight: '星夜', cream: '奶油' };
-  const THEME_IDS = ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'cream'];
+  const THEME_TEXT = { dusk: '暮色', dawn: '晨雾', sakura: '樱夜', forest: '森语', midnight: '星夜', ocean: '潮汐', cream: '奶油' };
+  const THEME_IDS = ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'ocean', 'cream'];
   const LEVEL_TEXT = { info: '通知', warm: '温柔', important: '重要' };
   const FB_TEXT = { open: '待处理', replied: '已回复', closed: '已关闭' };
   const ROLE_BADGE = { user: '用户', assistant: '陪伴者', proactive: '主动', system: '系统' };

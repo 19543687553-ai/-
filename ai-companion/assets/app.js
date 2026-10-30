@@ -6,7 +6,7 @@
 
   const PREFIX = (window.LUMI_CONFIG && window.LUMI_CONFIG.storagePrefix) || 'xinyu.';
   const AVATAR = 'assets/companion.jpg';
-  const THEME_ORDER = ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'cream'];
+  const THEME_ORDER = ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'ocean', 'cream'];
   const GESTURE_ICON = { hug: 'heart', headpat: 'hand', flower: 'flower', hand: 'hand', warm: 'layers', kiss: 'kiss', tea: 'tea', sing: 'volume', star: 'sparkles' };
   const GESTURE_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶', sing: '唱歌', star: '看星星' };
   const INTERACTION_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶', sing: '唱歌', star: '看星星' };
@@ -339,6 +339,10 @@
       if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
     });
     $('#exportChat').addEventListener('click', exportChat);
+    $('#weeklyReport').addEventListener('click', openWeeklyReport);
+    $('#reportClose').addEventListener('click', closeWeeklyReport);
+    $('#reportDone').addEventListener('click', closeWeeklyReport);
+    $('#reportModal').addEventListener('click', (e) => { if (e.target === $('#reportModal')) closeWeeklyReport(); });
     $('#checkinSubmit').addEventListener('click', submitCheckin);
     $('#checkinMoods').addEventListener('click', (e) => {
       const btn = e.target.closest('[data-checkin-mood]');
@@ -452,6 +456,7 @@
       if (e.key === 'Escape') {
         closeSide();
         closeSearch();
+        closeWeeklyReport();
       }
     });
   }
@@ -1225,6 +1230,53 @@
   function closeSearch() {
     const modal = $('#searchModal');
     if (modal) modal.classList.remove('open');
+  }
+
+  async function openWeeklyReport() {
+    const modal = $('#reportModal');
+    if (!modal) return;
+    const body = $('#reportBody');
+    const btn = $('#weeklyReport');
+    modal.classList.add('open');
+    body.innerHTML = '<div class="search-empty">正在把这一周翻出来…</div>';
+    btn.disabled = true;
+    try {
+      const data = await LumiAPI.request('weeklyReport');
+      renderWeeklyReport(data);
+    } catch (err) {
+      body.innerHTML = '<div class="search-empty">' + UI.escapeHTML(err.message || '这一页暂时翻不开') + '</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function closeWeeklyReport() {
+    const modal = $('#reportModal');
+    if (modal) modal.classList.remove('open');
+  }
+
+  function renderWeeklyReport(data) {
+    const range = data.range || {};
+    $('#reportRange').textContent = (range.from || '') + ' — ' + (range.to || '') + ' · 近 7 天';
+    const stats = [
+      { label: '说过的话', value: data.messages || 0, sub: '你先开口 ' + (data.mine || 0) + ' 句' },
+      { label: '见面天数', value: data.active_days || 0, sub: '这一周里的 ' + (range.days || 7) + ' 天' },
+      { label: '心情签到', value: data.checkin_count || 0, sub: data.top_checkin ? '最多「' + data.top_checkin + '」' : '还没有签到' },
+      { label: '靠近动作', value: data.gesture_count || 0, sub: data.gesture_label ? '最多「' + data.gesture_label + '」' : '还没有互动' }
+    ];
+    const statHTML = stats.map((s) =>
+      '<div class="report-stat"><span>' + UI.escapeHTML(s.label) + '</span><b>' + UI.escapeHTML(String(s.value)) + '</b><small>' + UI.escapeHTML(s.sub) + '</small></div>'
+    ).join('');
+    const linesHTML = (data.lines || []).map((line) =>
+      '<p class="report-line">' + UI.icon('sparkles', 12) + '<span>' + UI.escapeHTML(line) + '</span></p>'
+    ).join('');
+    const moodBlock = data.valence === null || data.valence === undefined
+      ? ''
+      : '<div class="report-quote">' + UI.icon('heart', 13) + '<span>情绪底色 ' + UI.escapeHTML(String(data.valence)) + ' · 亲密度 ' + UI.escapeHTML(String(data.affection === null || data.affection === undefined ? '—' : data.affection)) + ' · 此刻「' + UI.escapeHTML(data.mood_label || '平静') + '」</span></div>';
+    $('#reportBody').innerHTML =
+      '<div class="report-stats">' + statHTML + '</div>' +
+      '<div class="report-lines">' + linesHTML + '</div>' +
+      moodBlock;
   }
 
   async function runSearch() {

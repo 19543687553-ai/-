@@ -29,6 +29,7 @@ try {
         case 'history':                lumi_action_history(); break;
         case 'markRead':               lumi_action_mark_read(); break;
         case 'insights':               lumi_action_insights(); break;
+        case 'weeklyReport':           lumi_action_weekly_report(); break;
         case 'checkin':                lumi_action_checkin(); break;
         case 'checkinToday':           lumi_action_checkin_today(); break;
         case 'searchMessages':         lumi_action_search_messages(); break;
@@ -951,6 +952,99 @@ function lumi_action_insights(): void
         'achievements' => $achievements,
         'checkin' => lumi_checkin_summary($userId),
         'stats' => $stats,
+    ]);
+}
+
+function lumi_action_weekly_report(): void
+{
+    $user = lumi_require_user();
+    $pdo = lumi_db();
+    $userId = (int)$user['id'];
+    $now = time();
+    $from = strtotime('-6 days midnight');
+
+    $st = $pdo->prepare("SELECT COUNT(*) total, SUM(CASE WHEN role='user' THEN 1 ELSE 0 END) mine, SUM(CASE WHEN role<>'user' THEN 1 ELSE 0 END) hers FROM messages WHERE user_id=? AND created_at>=?");
+    $st->execute([$userId, $from]);
+    $row = $st->fetch() ?: [];
+    $total = (int)($row['total'] ?? 0);
+    $mine = (int)($row['mine'] ?? 0);
+    $hers = (int)($row['hers'] ?? 0);
+
+    $st = $pdo->prepare("SELECT COUNT(DISTINCT strftime('%Y-%m-%d', created_at, 'unixepoch', '+8 hours')) c FROM messages WHERE user_id=? AND created_at>=?");
+    $st->execute([$userId, $from]);
+    $activeDays = (int)$st->fetchColumn();
+
+    $st = $pdo->prepare("SELECT COUNT(*) FROM checkins WHERE user_id=? AND created_at>=?");
+    $st->execute([$userId, $from]);
+    $checkinCount = (int)$st->fetchColumn();
+    $st = $pdo->prepare("SELECT mood, COUNT(*) c FROM checkins WHERE user_id=? AND created_at>=? GROUP BY mood ORDER BY c DESC LIMIT 1");
+    $st->execute([$userId, $from]);
+    $topCheckin = $st->fetch();
+
+    $st = $pdo->prepare("SELECT type, COUNT(*) c FROM interactions WHERE user_id=? AND created_at>=? GROUP BY type ORDER BY c DESC LIMIT 1");
+    $st->execute([$userId, $from]);
+    $topGesture = $st->fetch();
+    $gestureLabel = '';
+    $gestureCount = 0;
+    if ($topGesture) {
+        $gestureCount = (int)$topGesture['c'];
+        $effect = lumi_gesture_effect((string)$topGesture['type']);
+        $gestureLabel = (string)($effect['label'] ?? $topGesture['type']);
+    }
+
+    $st = $pdo->prepare("SELECT ROUND(AVG(valence)) v, ROUND(AVG(affection)) a FROM mood_logs WHERE user_id=? AND created_at>=?");
+    $st->execute([$userId, $from]);
+    $moodAvg = $st->fetch() ?: ['v' => null, 'a' => null];
+    $valence = $moodAvg['v'] === null || $moodAvg['v'] === false ? null : (int)$moodAvg['v'];
+    $affection = $moodAvg['a'] === null || $moodAvg['a'] === false ? null : (int)$moodAvg['a'];
+
+    $persona = lumi_current_persona($user);
+    $lines = [];
+    if ($total > 0) {
+        $lines[] = '这一周你们说了 ' . $total . ' 句话，其中 ' . $mine . ' 句是你先开的口。';
+    } else {
+        $lines[] = '这一周还安静着，像一页没翻开的书。';
+    }
+    if ($activeDays >= 5) {
+        $lines[] = '你有 ' . $activeDays . ' 天回来过，她把这当成一种习惯。';
+    } elseif ($activeDays >= 2) {
+        $lines[] = '这一周你们见面 ' . $activeDays . ' 天，间隔刚刚好。';
+    }
+    if ($checkinCount > 0 && $topCheckin) {
+        $lines[] = '签到 ' . $checkinCount . ' 次，最常出现的心情是「' . $topCheckin['mood'] . '」。';
+    } else {
+        $lines[] = '这周还没签到过，下次心情有变化，记得告诉她。';
+    }
+    if ($gestureLabel !== '') {
+        $lines[] = '你最喜欢用「' . $gestureLabel . '」靠近她，一共 ' . $gestureCount . ' 次。';
+    }
+    if ($valence !== null) {
+        if ($valence >= 15) {
+            $lines[] = '这一周的情绪底色偏亮，她跟着你也轻快了些。';
+        } elseif ($valence >= -10) {
+            $lines[] = '这一周的情绪底色是平稳的，没有大起大落，也很好。';
+        } else {
+            $lines[] = '这一周有些沉。她没有催你，只是一直在旁边。';
+        }
+    }
+    $lines[] = '「' . $persona['name'] . '」会继续用她的方式陪你，下一周也一样。';
+
+    lumi_ok([
+        'range' => ['from' => date('n月j日', $from), 'to' => date('n月j日', $now), 'days' => 7],
+        'messages' => $total,
+        'mine' => $mine,
+        'hers' => $hers,
+        'active_days' => $activeDays,
+        'checkin_count' => $checkinCount,
+        'top_checkin' => $topCheckin ? (string)$topCheckin['mood'] : '',
+        'gesture_count' => $gestureCount,
+        'gesture_label' => $gestureLabel,
+        'valence' => $valence,
+        'affection' => $affection,
+        'mood_label' => (string)$user['mood_label'],
+        'persona' => (string)$persona['name'],
+        'companion_name' => (string)$user['companion_name'],
+        'lines' => $lines,
     ]);
 }
 

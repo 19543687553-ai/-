@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '1.4.0';
+const LUMI_VERSION = '1.5.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -771,7 +771,7 @@ function lumi_public_state(array $user): array
 
 function lumi_theme_ids(): array
 {
-    return ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'cream'];
+    return ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'ocean', 'cream'];
 }
 
 function lumi_public_user(array $user): array

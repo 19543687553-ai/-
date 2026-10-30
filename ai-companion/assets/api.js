@@ -286,6 +286,7 @@
     sakura: { name: '樱夜', sub: '没说完的梦', accent: '#ffb3c7' },
     forest: { name: '森语', sub: '雨后森林的呼吸', accent: '#a9d8ba' },
     midnight: { name: '星夜', sub: '把心事放得很轻', accent: '#8fb8ff' },
+    ocean: { name: '潮汐', sub: '海面下的一点安静', accent: '#7fd8c8' },
     cream: { name: '奶油', sub: '被阳光晒暖的午后', accent: '#d99a6c' }
   };
 
@@ -299,7 +300,7 @@
     }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-      const map = { dusk: '#100d16', dawn: '#f4eee8', sakura: '#1a0f16', forest: '#0b1512', midnight: '#0a1020', cream: '#fbf4e6' };
+      const map = { dusk: '#100d16', dawn: '#f4eee8', sakura: '#1a0f16', forest: '#0b1512', midnight: '#0a1020', ocean: '#061318', cream: '#fbf4e6' };
       meta.setAttribute('content', map[name] || '#100d16');
     }
     window.dispatchEvent(new CustomEvent('lumi:theme', { detail: { theme: name, accent: accent } }));
