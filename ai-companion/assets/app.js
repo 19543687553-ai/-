@@ -39,6 +39,8 @@
     typingTimer: null,
     pollTimer: null,
     banTimer: null,
+    maintenanceTimer: null,
+    maintenance: null,
     view: 'chat',
     currentTheme: 'dusk',
     personas: [],
@@ -95,6 +97,10 @@
     }
     if (err && err.code === 403 && err.data && err.data.ban) {
       showBan(err.data.ban);
+      return;
+    }
+    if (err && err.code === 503 && err.data && err.data.maintenance) {
+      showMaintenance(err.data.maintenance);
       return;
     }
     $('#personSub').textContent = '暂时连不上心屿，稍后再试试';
@@ -462,6 +468,14 @@
     window.addEventListener('lumi:ban', (e) => {
       if (e.detail && e.detail.ban) showBan(e.detail.ban);
     });
+    window.addEventListener('lumi:maintenance', (e) => {
+      if (e.detail) showMaintenance(e.detail);
+    });
+    $('#maintenanceRetry').addEventListener('click', () => location.reload());
+    $('#maintenanceLogout').addEventListener('click', () => {
+      LumiAPI.setToken('user', '');
+      location.replace('index.html?logout=1');
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeSide();
@@ -762,6 +776,8 @@
       renderMessages();
       if (err && err.code === 403 && err.data && err.data.ban) {
         showBan(err.data.ban);
+      } else if (err && err.code === 503 && err.data && err.data.maintenance) {
+        showMaintenance(err.data.maintenance);
       } else {
         input.value = text;
         resizeInput();
@@ -1545,6 +1561,45 @@
     const stamp = ban.banned_at || ban.until_at || 0;
     if (!stamp) return '—';
     return 'XY-' + Number(stamp).toString(36).toUpperCase();
+  }
+
+  function showMaintenance(data) {
+    data = data || {};
+    state.maintenance = data;
+    const modal = $('#maintenanceModal');
+    if (!modal) return;
+    clearInterval(state.maintenanceTimer);
+    $('#maintenanceIcon').innerHTML = UI.icon('clock', 26);
+    $('#maintenanceTitle').textContent = '心屿正在整理房间';
+    $('#maintenanceLead').textContent = data.notice || '心屿正在做一点小小的整理，很快就回来。';
+    $('#maintenanceReason').textContent = data.reason || '例行的维护与升级';
+    const until = String(data.until_text || '').trim();
+    $('#maintenanceUntil').textContent = until || '维护完成后刷新即可';
+
+    const wrap = $('#maintenanceCountdownWrap');
+    const counter = $('#maintenanceCountdown');
+    let remaining = Math.max(0, Number(data.remaining_seconds) || 0);
+    if (!until || remaining <= 0) {
+      wrap.hidden = true;
+    } else {
+      wrap.hidden = false;
+      wrap.querySelector('span').textContent = '距离重新开门还有';
+      const tick = () => {
+        counter.textContent = formatCountdown(remaining);
+        if (remaining <= 0) {
+          clearInterval(state.maintenanceTimer);
+          counter.textContent = '已到预计时间';
+          wrap.querySelector('span').textContent = '预计恢复时间已到，正在做最后检查';
+        }
+        remaining -= 1;
+      };
+      tick();
+      state.maintenanceTimer = setInterval(tick, 1000);
+    }
+
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    state.pollTimer && clearInterval(state.pollTimer);
   }
 
   function showBan(ban) {

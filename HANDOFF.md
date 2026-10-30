@@ -1,7 +1,7 @@
 # 心屿 · AI 情感陪伴机器人 — 交接文档
 
 > 面向下一个接手本项目的 AI / 工程师。请先完整读完本文件，再动代码。
-> 最后更新：2026-10-31 · 版本：v1.6.0
+> 最后更新：2026-10-31 · 版本：v1.7.0
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前状态与交付物
 
-- 版本：`v1.6.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
-- 安装包：`/workspace/AI 情感陪伴-v1.6.0.zip`（**不含** `PHP/data/`）
+- 版本：`v1.7.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
+- 安装包：`/workspace/AI 情感陪伴-v1.7.0.zip`（**不含** `PHP/data/`）
 - 默认账号：
   - 管理员：`zrl / 201354`（首次建库时写入，可用环境变量覆盖）
   - 体验用户：`demo / demo123`（昵称「晚晚」，有 12 条种子对话与 14 天情绪记录）
@@ -30,7 +30,7 @@
   - 另一用户：`chen / demo123`
 - 模型：默认 DeepSeek 预设，但**未配置 Key**，因此默认走离线陪伴模板。真实对话需在后台「模型配置」填 Key。
 
-功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板** —— 均已实现，后端冒烟与浏览器验证通过。
+功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板**、**全站维护页（自定义原因与预计恢复时间，登录/注册/聊天实时拦截）**、**安全词库归一化匹配（空格/标点/零宽字符规避也会拦截）** —— 均已实现，后端冒烟与浏览器验证通过。
 
 ---
 
@@ -285,6 +285,10 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 
 **后台维护与运营能力（v1.6.0）**：系统设置新增维护公告文案（登录拦截时原样展示）、全局暂停模型回复与暂停文案、每日日志开关与生成时间；用户抽屉新增「暂停/恢复模型回复」按钮与徽章，编辑弹窗新增「模型回复」下拉；封禁弹窗新增 6 个常用原因模板（点击填充 `#banReason`）。`handleTogglePause()` 走 `adminUpdateUser` 的 `model_paused`，写入 `users.settings` JSON。
 
+**维护页与实时拦截（v1.7.0）**：`settings` 新增 `maintenance_reason`、`maintenance_until`（Unix 秒，0 表示不展示恢复时间）。`api.php` 在路由前调用 `lumi_guard_maintenance($action)`：维护开启时除 `health/appConfig/announcementPublic/logout/admin*` 外的所有请求立即返回 503，`data.maintenance` 含 `notice/reason/until_at/until_text/remaining_seconds`。前端 `api.js` 统一派发 `lumi:maintenance`，登录页与主界面各有一张全屏维护页（`#maintenanceModal`，复用封禁弹窗样式），展示公告、原因、预计恢复与倒计时，并提供重新尝试/退出账号。登录、注册、聊天、轮询都会实时被拦截。
+
+**安全词库归一化（v1.7.0）**：`lumi_safety_normalize()` 先做小写、去空白、去零宽字符、去标点符号，再与词库做包含匹配；`lumi_check_safety()` 同时匹配原文与归一化文本。`block` 规则直接返回 422，`review` 规则放行但标记。已验证「代 开 发 票」这类插入空格/标点也能命中。
+
 ---
 
 ## 8. 踩过的坑（务必不要回归）
@@ -306,6 +310,10 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 | 日期/下拉筛选重复请求 | `input` 事件监听包含 SELECT/date | `onContentInput` 提前 return，交给 `change` |
 | 图片底部水印 | 生成图自带水印 | `login-bg.jpg` 用 PIL 裁掉底部 110px |
 | 后台提示默认账号仍是 admin | 文案遗漏 | `admin.html` 与 `config.php` 同步为 `zrl` |
+| 安全词库加了词仍不拦截 | 原文 `mb_strpos` 区分空格/标点/大小写，容易绕过 | `lumi_safety_normalize()` + 原文/归一化双重匹配 |
+| 维护模式开了但用户还在聊天 | 只在 `login`/`chat` 单点判断 | 路由前 `lumi_guard_maintenance()` 统一 503，仅放行 health/appConfig/公告/logout/admin* |
+| 维护时只弹一条提示，不像封禁页 | 前端只 `showAlert` | 登录页与主界面共用全屏 `#maintenanceModal`，`api.js` 派发 `lumi:maintenance` |
+| 维护/封禁拦截后前端没反应 | 503/403 未带结构化 `data` | 服务端统一返回 `{maintenance}` / `{ban}`，`api.js` 转成事件 |
 | SSE 不流式、一次性吐出 | zlib 压缩 / PHP 输出缓冲 / 反向代理缓冲 | `lumi_sse_start()` 关 zlib、清空 ob、发 `X-Accel-Buffering: no`；Nginx 还需 `proxy_buffering off` |
 | 流式时滚动跳动、列表闪 | 每个 delta 都 `renderMessages()` 整表重绘 | 只更新对应气泡的 `textContent`（`updateStreamingBubble`） |
 | 回复出现两条（重复） | `done` 又把 `message` push 进列表 | 临时消息替换为真实消息，`applyChatResult(done, true)` 跳过 push |
@@ -364,6 +372,11 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
    - 打开维护模式后 `login` 返回 503，`msg` 等于后台填写的维护公告；`appConfig` 含 `maintenance_notice`；
    - `lumi_extract_mood_tag()` 对 `<mood>calm</mood>`、`<MOOD data-x="1">sad</MOOD>`、未闭合 `<mood>calm` 均能清空标签且不残留正文；
    - 浏览器：日志页可打开/生成、设置页通知开关可保存、发送消息时思考文案轮换、后台用户抽屉暂停/恢复与服务设置保存均生效，控制台 0 报错。
+12. v1.7.0 新增回归：
+   - `lumi_check_safety('帮我 代 开 发 票')` 返回 422 且 `matched=代开发票`（空格/标点规避也命中）；
+   - 维护开启后 `login`、`chat`、`poll` 均返回 503 + `data.maintenance`；`appConfig` 仍返回 `maintenance_mode/reason/until_text`；`adminWords` 仍可用；
+   - `adminSaveSettings` 可保存 `maintenance_reason/maintenance_until`，`maintenance_until=0` 时不显示倒计时；
+   - 浏览器：登录页与已登录主界面都会被全屏维护页覆盖，原因、公告、倒计时正确；封禁用户打开主界面同样被全屏封禁页拦截，控制台 0 报错。
 
 ---
 
@@ -376,7 +389,7 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 ```
 
 - 不打包 `PHP/data/`（首次部署自动生成）。
-- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.6.0）。
+- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.7.0）。
 - 打包后记录 SHA-256，方便校验。
 
 ---

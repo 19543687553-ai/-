@@ -946,7 +946,11 @@
                 ${switchRow('safetyEnabled', '安全过滤', '启用敏感词拦截与复核', s.safety_enabled === '1')}
                 ${switchRow('maintenanceMode', '维护模式', '前台显示维护提示，暂停用户登录与聊天', s.maintenance_mode === '1')}
                 <label class="field span-2"><span class="field-label">维护公告文案</span>
-                  <textarea id="setMaintenanceNotice" style="min-height:70px" placeholder="维护时用户登录会看到这句话">${esc(s.maintenance_notice || '')}</textarea></label>
+                  <textarea id="setMaintenanceNotice" style="min-height:70px" placeholder="维护时前台维护页会展示这句话">${esc(s.maintenance_notice || '')}</textarea></label>
+                <label class="field"><span class="field-label">维护原因（前台展示）</span>
+                  <input class="input" id="setMaintenanceReason" value="${esc(s.maintenance_reason || '')}" placeholder="例如：数据库升级与例检"></label>
+                <label class="field"><span class="field-label">预计恢复时间（可选）</span>
+                  <input class="input" type="datetime-local" step="1" id="setMaintenanceUntil" value="${Number(s.maintenance_until || 0) > 0 ? toLocalInput(Number(s.maintenance_until)) : ''}"></label>
                 ${switchRow('modelPaused', '暂停模型回复（全局）', '所有用户暂时收到安静陪伴文案，不再请求模型', s.model_paused === '1')}
                 <label class="field span-2"><span class="field-label">暂停时的回复文案</span>
                   <input class="input" id="setModelPauseNotice" value="${esc(s.model_pause_notice || '')}" placeholder="例如：她现在想安静地陪你一会儿"></label>
@@ -1008,6 +1012,8 @@
       safety_enabled: $('#safetyEnabled').getAttribute('aria-checked') === 'true' ? 1 : 0,
       maintenance_mode: $('#maintenanceMode').getAttribute('aria-checked') === 'true' ? 1 : 0,
       maintenance_notice: $('#setMaintenanceNotice').value.trim(),
+      maintenance_reason: $('#setMaintenanceReason').value.trim(),
+      maintenance_until: $('#setMaintenanceUntil').value ? String(Math.floor(new Date($('#setMaintenanceUntil').value).getTime() / 1000)) : '0',
       model_paused: $('#modelPaused').getAttribute('aria-checked') === 'true' ? 1 : 0,
       model_pause_notice: $('#setModelPauseNotice').value.trim(),
       journal_enabled: $('#journalEnabled').getAttribute('aria-checked') === 'true' ? 1 : 0,

@@ -97,6 +97,9 @@
       if (json.code === 403 && json.data && json.data.ban) {
         window.dispatchEvent(new CustomEvent('lumi:ban', { detail: { ban: json.data.ban, source: kind } }));
       }
+      if (json.code === 503 && json.data && json.data.maintenance) {
+        window.dispatchEvent(new CustomEvent('lumi:maintenance', { detail: json.data.maintenance }));
+      }
       throw new ApiError(json.msg || '请求失败', json.code, json.data);
     }
     return json.data;
@@ -116,6 +119,9 @@
     }
     if (code === 403 && data && data.ban) {
       window.dispatchEvent(new CustomEvent('lumi:ban', { detail: { ban: data.ban, source: 'user' } }));
+    }
+    if (code === 503 && data && data.maintenance) {
+      window.dispatchEvent(new CustomEvent('lumi:maintenance', { detail: data.maintenance }));
     }
     throw new ApiError(message, code, data);
   }

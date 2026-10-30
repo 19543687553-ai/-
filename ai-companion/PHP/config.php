@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '1.6.0';
+const LUMI_VERSION = '1.7.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -338,6 +338,8 @@ function lumi_default_settings(): array
         'safety_enabled' => '1',
         'maintenance_mode' => '0',
         'maintenance_notice' => '心屿正在做一点小小的整理，很快就回来。',
+        'maintenance_reason' => '例行的维护与升级',
+        'maintenance_until' => '0',
         'model_paused' => '0',
         'model_pause_notice' => '她现在想安静地陪你一会儿，晚点再开口。',
         'journal_enabled' => '1',

@@ -6,7 +6,36 @@ require_once __DIR__ . '/emotion.php';
 
 $action = (string)lumi_param('action', '');
 
+function lumi_maintenance_payload(): array
+{
+    $until = (int)lumi_setting('maintenance_until', '0');
+    $reason = trim((string)lumi_setting('maintenance_reason', ''));
+    $notice = trim((string)lumi_setting('maintenance_notice', ''));
+    return [
+        'mode' => true,
+        'reason' => $reason !== '' ? $reason : '例行的维护与升级',
+        'notice' => $notice !== '' ? $notice : '心屿正在做一点小小的整理，很快就回来。',
+        'until_at' => $until,
+        'until_text' => $until > 0 ? date('Y-m-d H:i:s', $until) : '',
+        'remaining_seconds' => $until > 0 ? max(0, $until - time()) : 0,
+    ];
+}
+
+function lumi_guard_maintenance(string $action): void
+{
+    if ((int)lumi_setting('maintenance_mode', '0') !== 1) {
+        return;
+    }
+    $allowed = ['health', 'appConfig', 'announcementPublic', 'logout', 'adminLogin', 'adminLogout'];
+    if (in_array($action, $allowed, true) || strncmp($action, 'admin', 5) === 0) {
+        return;
+    }
+    $payload = lumi_maintenance_payload();
+    lumi_err($payload['notice'], 503, ['maintenance' => $payload]);
+}
+
 try {
+    lumi_guard_maintenance($action);
     switch ($action) {
         // ---------- 公共 ----------
         case 'health':                 lumi_action_health(); break;
@@ -125,6 +154,9 @@ function lumi_action_app_config(): void
         'support_contact' => lumi_setting('support_contact', ''),
         'maintenance_mode' => (bool)(int)lumi_setting('maintenance_mode', '0'),
         'maintenance_notice' => lumi_setting('maintenance_notice', ''),
+        'maintenance_reason' => lumi_setting('maintenance_reason', ''),
+        'maintenance_until' => (int)lumi_setting('maintenance_until', '0'),
+        'maintenance_until_text' => (int)lumi_setting('maintenance_until', '0') > 0 ? date('Y-m-d H:i:s', (int)lumi_setting('maintenance_until', '0')) : '',
         'server_time' => time(),
     ]);
 }
@@ -464,18 +496,31 @@ function lumi_action_delete_account(): void
 // 陪伴核心
 // =====================================================================
 
+function lumi_safety_normalize(string $text): string
+{
+    $text = mb_strtolower($text, 'UTF-8');
+    $text = preg_replace('/[\p{Z}\s\x{200B}-\x{200F}\x{202A}-\x{202E}\x{FEFF}]+/u', '', $text) ?? $text;
+    $text = preg_replace('/[\p{P}\p{S}]+/u', '', $text) ?? $text;
+    return $text;
+}
+
 function lumi_check_safety(string $text): array
 {
     if (!(int)lumi_setting('safety_enabled', '1')) {
         return ['allowed' => true, 'flagged' => false, 'matched' => ''];
     }
     $rows = lumi_db()->query("SELECT word, action, category FROM sensitive_words ORDER BY LENGTH(word) DESC")->fetchAll();
+    $haystack = lumi_safety_normalize($text);
     foreach ($rows as $row) {
-        if ($row['word'] !== '' && mb_strpos($text, $row['word']) !== false) {
+        $word = (string)$row['word'];
+        if ($word === '') continue;
+        $needle = lumi_safety_normalize($word);
+        $matched = mb_strpos($text, $word) !== false || ($needle !== '' && mb_strpos($haystack, $needle) !== false);
+        if ($matched) {
             if ($row['action'] === 'block') {
-                return ['allowed' => false, 'flagged' => true, 'matched' => $row['word'], 'category' => $row['category']];
+                return ['allowed' => false, 'flagged' => true, 'matched' => $word, 'category' => $row['category']];
             }
-            return ['allowed' => true, 'flagged' => true, 'matched' => $row['word'], 'category' => $row['category']];
+            return ['allowed' => true, 'flagged' => true, 'matched' => $word, 'category' => $row['category']];
         }
     }
     return ['allowed' => true, 'flagged' => false, 'matched' => ''];
@@ -1907,6 +1952,7 @@ function lumi_action_admin_save_settings(): void
         'app_name', 'app_tagline', 'allow_register', 'default_theme', 'welcome_message',
         'proactive_enabled', 'proactive_idle_seconds', 'proactive_cooldown_seconds', 'proactive_probability',
         'max_context_messages', 'safety_enabled', 'maintenance_mode', 'maintenance_notice',
+        'maintenance_reason', 'maintenance_until',
         'model_paused', 'model_pause_notice', 'journal_enabled', 'journal_hour',
         'support_contact',
         'register_bonus_affection', 'max_message_length', 'messages_per_minute',
@@ -1918,6 +1964,9 @@ function lumi_action_admin_save_settings(): void
             if (is_bool($value)) $value = $value ? '1' : '0';
             if (is_array($value)) continue;
             $value = lumi_clean_text((string)$value, $key === 'welcome_message' || $key === 'app_tagline' ? 1000 : 200);
+            if ($key === 'maintenance_until') {
+                $value = (string)max(0, (int)$value);
+            }
             if ($key === 'default_theme' && !in_array($value, lumi_theme_ids(), true)) {
                 continue;
             }

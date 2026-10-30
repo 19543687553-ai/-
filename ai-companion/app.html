@@ -429,6 +429,25 @@
     </div>
   </div>
 
+  <!-- 维护页 -->
+  <div class="ban-modal" id="maintenanceModal" role="dialog" aria-modal="true" aria-labelledby="maintenanceTitle">
+    <div class="ban-card">
+      <div class="ban-icon" id="maintenanceIcon"></div>
+      <h2 id="maintenanceTitle">心屿正在整理房间</h2>
+      <p id="maintenanceLead">这段时间登录、注册和聊天都会暂停。等房间收拾好，门会重新打开。</p>
+      <div class="ban-detail">
+        <div class="ban-row"><span>维护原因</span><strong class="reason" id="maintenanceReason">—</strong></div>
+        <div class="ban-row"><span>预计恢复</span><strong id="maintenanceUntil">—</strong></div>
+      </div>
+      <div class="ban-countdown" id="maintenanceCountdownWrap"><span>距离重新开门还有</span><b id="maintenanceCountdown">—</b></div>
+      <div class="ban-actions">
+        <button class="btn btn-primary" id="maintenanceRetry" type="button">重新尝试</button>
+        <button class="btn btn-ghost" id="maintenanceLogout" type="button">退出账号</button>
+      </div>
+      <p class="ban-foot">维护期间无论登录、注册还是与模型对话，都会先看到这张维护页。完成后刷新即可继续。</p>
+    </div>
+  </div>
+
   <!-- 封禁弹窗 -->
   <div class="ban-modal" id="banModal" role="dialog" aria-modal="true" aria-labelledby="banTitle">
     <div class="ban-card">

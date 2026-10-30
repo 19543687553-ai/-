@@ -6,7 +6,7 @@
 
   const PREFIX = (window.LUMI_CONFIG && window.LUMI_CONFIG.storagePrefix) || 'xinyu.';
   const REMEMBER_KEY = PREFIX + 'remember';
-  const app = { config: null, ban: null, banTimer: null, busy: false };
+  const app = { config: null, ban: null, banTimer: null, maintenanceTimer: null, busy: false };
 
   const $ = (sel) => document.querySelector(sel);
 
@@ -19,6 +19,7 @@
     initPasswordToggles();
     initForms();
     initBanModal();
+    initMaintenance();
     restoreRemembered();
     initServerState();
     maybeRedirect();
@@ -155,6 +156,8 @@
       setBusy(button, false);
       if (err && err.code === 403 && err.data && err.data.ban) {
         showBan(err.data.ban, username);
+      } else if (err && err.code === 503 && err.data && err.data.maintenance) {
+        showMaintenance(err.data.maintenance);
       } else {
         showAlert(err && err.message ? err.message : '暂时没能连上心屿，请稍后再试');
       }
@@ -200,7 +203,11 @@
       setTimeout(() => { location.href = 'app.html'; }, 520);
     } catch (err) {
       setBusy($('#registerSubmit'), false);
-      showAlert(err && err.message ? err.message : '注册没能完成，请稍后再试');
+      if (err && err.code === 503 && err.data && err.data.maintenance) {
+        showMaintenance(err.data.maintenance);
+      } else {
+        showAlert(err && err.message ? err.message : '注册没能完成，请稍后再试');
+      }
     }
   }
 
@@ -252,8 +259,12 @@
       node.className = 'server-state online';
       node.querySelector('span').textContent = '后端在线 · ' + (config.app_name || '心屿');
       if (config.maintenance_mode) {
-        const notice = String(config.maintenance_notice || '').trim();
-        showAlert(notice || '心屿正在短暂维护，部分功能可能无法使用。', 'warn');
+        showMaintenance({
+          notice: String(config.maintenance_notice || '').trim(),
+          reason: String(config.maintenance_reason || '').trim(),
+          until_text: String(config.maintenance_until_text || ''),
+          remaining_seconds: Math.max(0, Number(config.maintenance_until || 0) - Number(config.server_time || 0))
+        });
       }
       if (config.allow_register === false) {
         const tab = $('#tabRegister');
@@ -375,6 +386,56 @@
     document.body.style.overflow = '';
     app.ban = null;
     hideAlert();
+  }
+
+  /* ---------------- 维护页 ---------------- */
+  function initMaintenance() {
+    window.addEventListener('lumi:maintenance', (event) => {
+      if (event.detail) showMaintenance(event.detail);
+    });
+    $('#maintenanceRetry').addEventListener('click', () => location.reload());
+    $('#maintenanceLogout').addEventListener('click', () => {
+      LumiAPI.setToken('user', '');
+      location.reload();
+    });
+  }
+
+  function showMaintenance(data) {
+    data = data || {};
+    const modal = $('#maintenanceModal');
+    if (!modal) return;
+    clearInterval(app.maintenanceTimer);
+    $('#maintenanceIcon').innerHTML = UI.icon('clock', 26);
+    $('#maintenanceTitle').textContent = '心屿正在整理房间';
+    $('#maintenanceLead').textContent = data.notice || '心屿正在做一点小小的整理，很快就回来。';
+    $('#maintenanceReason').textContent = data.reason || '例行的维护与升级';
+    const until = String(data.until_text || '').trim();
+    $('#maintenanceUntil').textContent = until || '维护完成后刷新即可';
+
+    const wrap = $('#maintenanceCountdownWrap');
+    const counter = $('#maintenanceCountdown');
+    let remaining = Math.max(0, Number(data.remaining_seconds) || 0);
+    if (!until || remaining <= 0) {
+      wrap.style.display = 'none';
+    } else {
+      wrap.style.display = 'flex';
+      wrap.querySelector('span').textContent = '距离重新开门还有';
+      const tick = () => {
+        counter.textContent = formatCountdown(remaining);
+        if (remaining <= 0) {
+          clearInterval(app.maintenanceTimer);
+          counter.textContent = '已到预计时间';
+          wrap.querySelector('span').textContent = '预计恢复时间已到，正在做最后检查';
+        }
+        remaining -= 1;
+      };
+      tick();
+      app.maintenanceTimer = setInterval(tick, 1000);
+    }
+
+    hideAlert();
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
   }
 
   function formatCountdown(seconds) {
