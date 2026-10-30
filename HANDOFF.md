@@ -1,7 +1,7 @@
 # 心屿 · AI 情感陪伴机器人 — 交接文档
 
 > 面向下一个接手本项目的 AI / 工程师。请先完整读完本文件，再动代码。
-> 最后更新：2026-10-30 · 版本：v1.3.0
+> 最后更新：2026-10-30 · 版本：v1.4.0
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前状态与交付物
 
-- 版本：`v1.3.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
-- 安装包：`/workspace/AI 情感陪伴-v1.3.0.zip`（**不含** `PHP/data/`）
+- 版本：`v1.4.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
+- 安装包：`/workspace/AI 情感陪伴-v1.4.0.zip`（**不含** `PHP/data/`）
 - 默认账号：
   - 管理员：`zrl / 201354`（首次建库时写入，可用环境变量覆盖）
   - 体验用户：`demo / demo123`（昵称「晚晚」，有 12 条种子对话与 14 天情绪记录）
@@ -30,7 +30,7 @@
   - 另一用户：`chen / demo123`
 - 模型：默认 DeepSeek 预设，但**未配置 Key**，因此默认走离线陪伴模板。真实对话需在后台「模型配置」填 Key。
 
-功能完成度：登录注册、**六套主题**、情绪引擎、主动说话、**七种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**八种人格预设（同时影响系统提示词与离线降级回复）** —— 均已实现并通过浏览器验证。
+功能完成度：登录注册、**六套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十二种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）** —— 均已实现并通过浏览器验证。
 
 ---
 
@@ -87,7 +87,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 
 模型 API Key 用 AES-256-GCM（`openssl_encrypt`，随机 IV + tag）加密入库；主密钥来自 `LUMI_SECRET` 或 `PHP/data/.app_secret`。后台只返回掩码（`lumi_mask_key`），任何接口都不回显明文。
 
-### 数据库表（15 张）
+### 数据库表（16 张）
 
 | 表 | 用途 |
 | --- | --- |
@@ -97,7 +97,8 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 | `conversations` / `messages` | 会话与消息（role、emotion、mood_after、pinned、read） |
 | `ban_history` | 封禁原因、起止时间（秒级）、操作人、解封记录 |
 | `mood_logs` | 情绪快照（valence/anger/sadness/energy/affection/label/source） |
-| `interactions` | 手势互动（hug/headpat/flower/hand/warm） |
+| `interactions` | 手势互动（hug/headpat/flower/hand/warm/kiss/tea/sing/star） |
+| `checkins` | 每日心情签到（mood/note/valence/created_at，同一天可多次） |
 | `feedbacks` | 用户反馈与后台回复 |
 | `announcements` | 公告（级别、启用、过期时间） |
 | `sensitive_words` | 敏感词与处置动作 |
@@ -115,14 +116,19 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 
 ### 用户
 `register`、`login`、`logout`、`me`、`updateProfile`、`changePassword`、`deleteAccount`、
-`chat`、`gesture`、`poll`、`history`、`markRead`、`insights`、`pinMessage`、`feedbackCreate`、`feedbackList`
+`chat`、`gesture`、`poll`、`history`、`markRead`、`insights`、`checkin`、`checkinToday`、`searchMessages`、`exportChat`、`pinMessage`、`feedbackCreate`、`feedbackList`
 
 ### 后台
 `adminLogin`、`adminLogout`、`adminMe`、`adminStats`、`adminUsers`、`adminUserDetail`、`adminUpdateUser`、`adminBanUser`、`adminUnbanUser`、`adminResetPassword`、`adminDeleteUser`、`adminConversations`、`adminMessages`、`adminDeleteMessage`、`adminPinMessage`、`adminSendMessage`、`adminMoodAnalytics`、`adminSettings`、`adminSaveSettings`、`adminModelSave`、`adminModelTest`、`adminModelList`、`adminAnnouncements`、`adminAnnouncementSave`、`adminAnnouncementDelete`、`adminWords`、`adminWordSave`、`adminWordDelete`、`adminFeedbacks`、`adminFeedbackReply`、`adminAdmins`、`adminAdminSave`、`adminAdminDelete`、`adminAuditLogs`、`adminBroadcast`、`adminBackup`、`adminExportUsers`、`adminSystemInfo`
 
 几个容易记错的返回结构：
 
-- `me` → `{user, state, announcement, unread_count, model_configured, app_name, personas, server_time}`；`personas` 为 8 条人格预设（id/name/tagline/desc/prompt/accent/icon/greeting），`user.persona_id` 为当前人格。
+- `me` → `{user, state, announcement, unread_count, model_configured, app_name, personas, checkin, checkin_moods, server_time}`；`personas` 为 12 条人格预设（id/name/tagline/category/desc/prompt/accent/icon/greeting），`user.persona_id` 为当前人格。
+- `insights` → 含 `stats/days/distribution/interactions/milestones/pinned/achievements/checkin`；`achievements` 为 6 个徽章（`first_word/hundred/seven/heartlink/collector/first_touch`），每项 `{id,label,desc,icon,unlocked}`。
+- `checkin` 参数 `mood/note`，返回 `{message,state,checkin,reply}`，并把人格式化为一条带 `meta.checkin` 的消息写入会话。
+- `checkinToday` → `{checkin,moods,state}`；`checkin` 汇总结构 `{today,recent(7天),streak,total}`。
+- `searchMessages` → 参数 `q`（≤40 字），返回 `{items}`（最近 30 条，含 role/content/created_at）。
+- `exportChat` → `{filename, content(Markdown), count}`（最多 4000 条，按日期分节）。
 - `adminStats` → `{stats, series(14天), mood_distribution, theme_distribution, recent_users, recent_audit, recent_feedbacks}`
 - `adminUserDetail` → `{user, state, ban, messages, mood_series, ban_history, feedbacks, interactions, last_session, stats}`
 - `adminUsers` → `{items, total, page, per_page, pages}`，筛选 `q/status(all|active|banned|high)/page`
@@ -168,20 +174,33 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 | `lumi_fallback_reply()` | 未配置模型时的本地模板回复（按情绪/关键词选句） |
 | `lumi_proactive_message()` | 主动说话：idle + 冷却 + 概率 |
 | `lumi_gesture_effect()` | 手势 → 情绪/亲密度变化 + 文案 |
-| `lumi_personas()` / `lumi_persona_catalog()` | 八种人格预设；后者为前端可用的精简列表 |
+| `lumi_personas()` / `lumi_persona_catalog()` | 十二种人格预设；后者为前端可用的精简列表（含 `category`） |
 | `lumi_persona_id()` / `lumi_current_persona()` | 从 `users.settings` JSON 读取人格，非法值回退 `gentle` |
+| `lumi_reply_style()` | 读取 `settings.reply_style`（brief/balanced/deep），非法值回退 `balanced` |
+| `lumi_checkin_moods()` / `lumi_checkin_catalog()` / `lumi_checkin_reply()` | 签到心情数值表、前端选项、人格化签到回复 |
 
 关系阶段由 `lumi_relationship()` 根据亲密度映射（陌生 → 熟悉 → 亲近 → 依恋……）。提示词模板在 `settings.model_system_prompt`，支持 `{{companion_name}}`、`{{nickname}}`、`{{affection}}`、`{{mood_label}}` 等变量。
 
 **主动说话的触发链**：前端每 22 秒 `poll` → 后端检查 `proactive_enabled`、用户是否开启主动、距最后一条消息是否 ≥ `proactive_idle_seconds`（默认 75s）、距上次主动是否 ≥ `proactive_cooldown_seconds`（180s）、随机数 < `proactive_probability`（0.55）→ 生成一条 `role=proactive` 消息。**页面关闭时不会主动推送**（无 WebSocket/推送）。
 
-**手势**：`hug` 抱抱 / `headpat` 摸摸头 / `flower` 送花 / `hand` 牵手 / `warm` 披外套 / `kiss` 亲亲 / `tea` 递热茶。前端文案与后端 label 必须一致（曾经不一致，已修）；新增手势需同步 `api.php` 白名单、`emotion.php` 的 `$map`、`app.html` 按钮与 `app.js` 的 `GESTURE_ICON/NAME/INTERACTION_NAME`。
+**手势（v1.4.0）**：`hug` 抱抱 / `headpat` 摸摸头 / `flower` 送花 / `hand` 牵手 / `warm` 披外套 / `kiss` 亲亲 / `tea` 递热茶 / `sing` 唱歌 / `star` 看星星。前端文案与后端 label 必须一致（曾经不一致，已修）；新增手势需同步 `api.php` 白名单、`emotion.php` 的 `lumi_gesture_effect()`、`app.html` 按钮与 `app.js` 的 `GESTURE_ICON/NAME/INTERACTION_NAME`。
 
-**人格（v1.3.0）**：8 套预设 `gentle 温柔知心 / sunshine 元气少女 / sharp 毒舌损友 / mature 成熟姐姐 / poetic 文艺诗人 / rational 冷静顾问 / clingy 黏人小猫 / healing 疗愈长者`。人格 id 存 `users.settings` JSON 的 `persona_id`（默认 `gentle`，**不改表结构**）。生效方式：
+**人格（v1.4.0）**：12 套预设，带 `category` 分类：
+- 温柔：`gentle 温柔知心 / healing 疗愈长者`
+- 活泼：`sunshine 元气少女 / sharp 毒舌损友 / clingy 黏人小猫 / tsundere 傲娇青梅`
+- 沉稳：`mature 成熟姐姐 / butler 温柔执事`
+- 理性：`rational 冷静顾问 / coach 元气教练`
+- 文艺：`poetic 文艺诗人 / mystic 星语占卜师`
+
+人格 id 存 `users.settings` JSON 的 `persona_id`（默认 `gentle`，**不改表结构**）。生效方式：
 
 - 系统提示词：`lumi_build_system_prompt()` 在原模板后追加「【当前人格】…」，若模板中的 `{{persona}}` 已包含该人格原文则自动去重；
 - 离线降级：`lumi_fallback_reply()` 优先使用人格的 `fallback` 与 `greeting`，其余情绪类别仍走默认模板；
-- 前端：设置页人格卡片选择后立即 `updateProfile` 保存 `persona_id + companion_persona`，聊天头部展示人格徽标。
+- 前端：设置页人格卡片选择后立即 `updateProfile` 保存 `persona_id + companion_persona`，聊天头部展示人格徽标；12 张卡片按分类筛选（`#personaFilters`，默认「全部」），避免面板过长。
+
+**回复节奏（v1.4.0）**：设置页 `#replyStyle`（简短/适中/深入）写入 `users.settings.reply_style`；`lumi_build_system_prompt()` 末尾追加「【回复节奏】…」，真正约束模型输出长度。离线模板不受影响。
+
+**每日签到（v1.4.0）**：`checkin` 表 + `checkin/checkinToday` 接口。5 种心情（开心/平静/低落/疲惫/期待）各自调整 valence/energy/affection/sadness/anger；每天限 8 次；回复由 `lumi_checkin_reply()` 生成并拼接人格的 `checkin_tail`，同时作为一条 `meta.checkin` 消息进入会话。`lumi_checkin_summary()` 汇总今日、最近 7 天、连续天数与总数。
 
 ---
 
@@ -230,9 +249,15 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 
 ### 主界面
 
-左侧导航（桌面竖栏 / 移动底栏）+ 聊天区 + 右侧情绪栏；视图 `chat/insights/memories/settings`。`setMood()` 用 `--mood-a/--mood-b` 驱动光晕。包装输入框、手势条（7 个动作，窄屏自动换行）、建议 chips。轮询 22s。封禁监听 `lumi:ban`。聊天头部除心情 chip 外还有人格徽标 `#personaChip`，由 `renderPersona()` 根据 `state.personas` 渲染。
+左侧导航（桌面竖栏 / 移动底栏）+ 聊天区 + 右侧情绪栏；视图 `chat/insights/memories/settings`。`setMood()` 用 `--mood-a/--mood-b` 驱动光晕。包装输入框、手势条（9 个动作，窄屏自动换行）、建议 chips。轮询 22s。封禁监听 `lumi:ban`。聊天头部除心情 chip 外还有人格徽标 `#personaChip`，由 `renderPersona()` 根据 `state.personas` 渲染；新增搜索按钮 `#btnSearch` 打开 `#searchModal`。
 
-**设置页人格卡片（v1.3.0）**：`#personaGrid` 在 `me` 返回后由 `buildPersonaGrid()` 渲染 8 张卡，点击 `choosePersona()` 立即写服务端并同步 `#setPersona` 文本；`renderPersona()` 统一维护选中态、头部徽标与提示文案。修改 `state.user.persona_id` 后必须调用 `renderPersona()`。
+**设置页人格卡片（v1.4.0）**：`#personaGrid` 在 `me` 返回后由 `buildPersonaGrid()` 渲染 12 张卡；`#personaFilters` 由 `buildPersonaFilters()` 渲染分类筛选（全部/温柔/活泼/沉稳/理性/文艺），事件委托只绑定一次，切换时 `renderPersonaCards()` 按 `category` 重绘。点击卡片 `choosePersona()` 立即写服务端并同步 `#setPersona` 文本；`renderPersona()` 统一维护选中态、头部徽标与提示文案。修改 `state.user.persona_id` 后必须调用 `renderPersona()`。
+
+**情绪轨迹页（v1.4.0）**：顶部「今天的你」签到卡片（5 个心情 chip、可选备注、7 天圆点、连续天数），随后 4 个统计卡、6 个成就徽章（`renderBadges()`）、14 天曲线、情绪分布、互动方式、时间节点。`renderInsights()` 同时同步 `state.checkin` 并重绘签到。
+
+**回忆页（v1.4.0）**：收藏卡片外，页头 `#exportChat` 调 `exportChat` 拉取 Markdown 并触发浏览器下载（`LumiAPI.request('exportChat', {}, {timeout:30000})`）。
+
+**搜索（v1.4.0）**：`searchMessages` 最多 30 条；结果点击后 `closeSearch()` + `focusMessage(id)`，后者会循环 `loadMore()`（最多 8 页）以便跳转到很早的消息并高亮。
 
 **发送消息（v1.2.0）**：`sendMessage()` 调 `LumiAPI.stream('chat', {message, conversation_id, stream:1}, onEvent)`。`start` 时插入一条 `id='stream-<ts>'` 的临时助手消息（`streaming:true`，CSS 显示闪烁光标）；`delta` 只调用 `updateStreamingBubble()` 改那一个气泡的 `textContent`（**不要 `renderMessages()` 整表重绘**，否则滚动跳动）；`done` 用真实 `message` 覆盖临时消息字段并在下一次 `renderMessages()` 落地；返回 `{fallback}` 时走旧的一次性逻辑。失败时移除临时用户/助手消息并回填输入框，`403+ban` 弹封禁弹窗。
 
@@ -273,6 +298,10 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 | 人格切换成功但回复语气没变 | 人格未拼进系统提示词 / 只改了前端 | `updateProfile` 存 `settings.persona_id`，`lumi_build_system_prompt()` 追加人格段 |
 | 保存偏好后人格丢失 | `settings` JSON 被新数组覆盖 | `updateProfile` 先读 `$existing` 再合并 `persona_id` 与 preferences |
 | 人格卡片白屏 | `me` 尚未返回就渲染 | `buildPersonaGrid()` 只在 `applyMe()` 拿到 `personas` 后调用 |
+| 新增人格后设置页过长 | 12 张卡片平铺 | `#personaFilters` 分类筛选 + `renderPersonaCards()` 局部重绘 |
+| 签到卡片不刷新 | 只读了 `insights` 未同步 `state.checkin` | `renderInsights()` 内 `state.checkin = data.checkin; renderCheckin()` |
+| 搜索点开旧消息后无反应 | 消息不在当前分页列表 | `focusMessage()` 循环 `loadMore()`（最多 8 页）后再定位 |
+| 回复节奏切换后不持久 | 只改前端分段按钮 | `#replyStyle` 点击写 `settings.reply_style`，`fillSettings()` 回填 `.active` |
 
 ---
 
@@ -293,6 +322,14 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 6. 浏览器：至少覆盖 1920×1080、1366×768、844×390、390×844；检查横向溢出、输入框 16px、横屏首屏可见输入区、抽屉标签完整、右侧心情卡片不被压缩、控制台 0 报错。
 7. 前台链路：demo 登录 → 发消息（观察打字机、确认只有一条回复）→ 情绪变化 → 手势 → 主动说话（调小 idle 或等 75s）→ 主题切换 → 设置保存（含语音朗读开关持久化）→ 反馈提交；momo 登录 → 封禁弹窗。
 8. 人格与主题（v1.3.0）：`me` 应返回 `personas` 8 条；`updateProfile` 传 `persona_id=sharp` 后 `user.persona_id` 生效，离线模式发「你好」应得到阿澈式台词；非法 persona 返回 400；`kiss/tea` 手势返回 200；6 个主题均能切换且后台「默认主题」可选；刷新后人格/主题不被重置。
+9. v1.4.0 新增回归：
+   - `me` 返回 `personas` 12 条（每条含 `category`）、`checkin_moods` 5 条、`checkin` 汇总；
+   - `checkin`（mood=开心/备注）→ 200，返回 `reply` 与 `checkin.today`，并写入一条 `meta.checkin` 消息；`checkinToday` 的 `streak` 正确递增；
+   - `gesture` 的 `sing`、`star` 返回 200 与对应文案；
+   - `searchMessages` 与 `exportChat` 返回 200，导出内容为 Markdown；
+   - `updateProfile` 传 `reply_style=deep` 生效、传非法值返回 400；
+   - `insights` 返回 6 个 `achievements` 且 `unlocked` 随数据变化；
+   - 浏览器：设置页 6 个筛选 + 12 张卡片、签到卡片/徽章/搜索弹窗/导出按钮正常，控制台 0 报错。
 
 ---
 
@@ -305,7 +342,7 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 ```
 
 - 不打包 `PHP/data/`（首次部署自动生成）。
-- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.3.0）。
+- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.4.0）。
 - 打包后记录 SHA-256，方便校验。
 
 ---

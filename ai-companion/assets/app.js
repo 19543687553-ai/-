@@ -7,9 +7,10 @@
   const PREFIX = (window.LUMI_CONFIG && window.LUMI_CONFIG.storagePrefix) || 'xinyu.';
   const AVATAR = 'assets/companion.jpg';
   const THEME_ORDER = ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'cream'];
-  const GESTURE_ICON = { hug: 'heart', headpat: 'hand', flower: 'flower', hand: 'hand', warm: 'layers', kiss: 'kiss', tea: 'tea' };
-  const GESTURE_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶' };
-  const INTERACTION_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶' };
+  const GESTURE_ICON = { hug: 'heart', headpat: 'hand', flower: 'flower', hand: 'hand', warm: 'layers', kiss: 'kiss', tea: 'tea', sing: 'volume', star: 'sparkles' };
+  const GESTURE_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶', sing: '唱歌', star: '看星星' };
+  const INTERACTION_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶', sing: '唱歌', star: '看星星' };
+  const PERSONA_CATEGORIES = ['全部', '温柔', '活泼', '沉稳', '理性', '文艺'];
 
   const MOOD = {
     '开心': { icon: 'smile', a: '#ffd27d', b: '#ffb37a', desc: '眼睛弯弯的，连语气都轻快了一点。' },
@@ -40,7 +41,12 @@
     banTimer: null,
     view: 'chat',
     currentTheme: 'dusk',
-    personas: []
+    personas: [],
+    personaFilter: '全部',
+    checkin: null,
+    checkinMoods: [],
+    checkinPick: '',
+    searchTimer: null
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -98,10 +104,14 @@
     state.user = data.user || state.user;
     state.announcement = data.announcement || null;
     state.personas = Array.isArray(data.personas) ? data.personas : [];
+    state.checkinMoods = Array.isArray(data.checkin_moods) ? data.checkin_moods : [];
+    state.checkin = data.checkin || null;
     $('#companionName').textContent = state.user.companion_name || '小屿';
     document.title = '心屿 · ' + (state.user.companion_name || '小屿') + '在等你';
+    buildPersonaFilters();
     buildPersonaGrid();
     renderPersona();
+    renderCheckin();
     if (state.user.theme && THEME_ORDER.indexOf(state.user.theme) >= 0) {
       state.currentTheme = state.user.theme;
       UI.applyTheme(state.currentTheme, '');
@@ -215,23 +225,54 @@
   /* =========================================================
      人格
      ========================================================= */
+  function buildPersonaFilters() {
+    const box = $('#personaFilters');
+    if (!box) return;
+    if (box.dataset.built !== '1') {
+      box.dataset.built = '1';
+      box.innerHTML = PERSONA_CATEGORIES.map((cat) =>
+        '<button class="persona-filter" type="button" data-cat="' + UI.escapeHTML(cat) + '" aria-pressed="' + (cat === state.personaFilter ? 'true' : 'false') + '">' +
+          UI.escapeHTML(cat) +
+        '</button>'
+      ).join('');
+      box.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-cat]');
+        if (!btn) return;
+        state.personaFilter = btn.dataset.cat;
+        $$('.persona-filter').forEach((b) => b.setAttribute('aria-pressed', b.dataset.cat === state.personaFilter ? 'true' : 'false'));
+        renderPersonaCards();
+      });
+    }
+    $$('.persona-filter').forEach((b) => b.setAttribute('aria-pressed', b.dataset.cat === state.personaFilter ? 'true' : 'false'));
+  }
+
+  function personaCardHTML(p) {
+    return '<button class="persona-card" type="button" data-persona="' + UI.escapeHTML(p.id) + '" aria-pressed="false" style="--p-accent:' + (p.accent || 'var(--accent)') + '">' +
+      '<span class="persona-icon">' + UI.icon(p.icon, 18) + '</span>' +
+      '<strong>' + UI.escapeHTML(p.name) + '</strong>' +
+      '<small>' + UI.escapeHTML(p.tagline) + '</small>' +
+      '<em>' + UI.escapeHTML(p.desc) + '</em>' +
+    '</button>';
+  }
+
   function buildPersonaGrid() {
     const box = $('#personaGrid');
     if (!box || !state.personas.length) return;
-    if (box.dataset.built === '1') return;
-    box.dataset.built = '1';
-    box.innerHTML = state.personas.map((p) =>
-      '<button class="persona-card" type="button" data-persona="' + UI.escapeHTML(p.id) + '" aria-pressed="false" style="--p-accent:' + (p.accent || 'var(--accent)') + '">' +
-        '<span class="persona-icon">' + UI.icon(p.icon, 18) + '</span>' +
-        '<strong>' + UI.escapeHTML(p.name) + '</strong>' +
-        '<small>' + UI.escapeHTML(p.tagline) + '</small>' +
-        '<em>' + UI.escapeHTML(p.desc) + '</em>' +
-      '</button>'
-    ).join('');
-    box.addEventListener('click', (e) => {
-      const card = e.target.closest('[data-persona]');
-      if (card) choosePersona(card.dataset.persona);
-    });
+    if (box.dataset.built !== '1') {
+      box.dataset.built = '1';
+      box.addEventListener('click', (e) => {
+        const card = e.target.closest('[data-persona]');
+        if (card) choosePersona(card.dataset.persona);
+      });
+    }
+    renderPersonaCards();
+  }
+
+  function renderPersonaCards() {
+    const box = $('#personaGrid');
+    if (!box) return;
+    const list = state.personas.filter((p) => state.personaFilter === '全部' || (p.category || '温柔') === state.personaFilter);
+    box.innerHTML = list.map(personaCardHTML).join('');
     renderPersona();
   }
 
@@ -257,7 +298,7 @@
     const note = $('#personaNote');
     if (note) {
       note.textContent = p
-        ? '当前人格：' + p.name + ' · ' + p.tagline + '。下方描述可以再微调，她会按这个底色说话。'
+        ? '当前人格：' + p.name + ' · ' + p.tagline + '。她大概会这样开口：' + p.greeting + ' 下方描述可以再微调。'
         : '也可以直接写下你希望的性格底色。';
     }
   }
@@ -290,6 +331,21 @@
     $('#railLogout').addEventListener('click', logout);
     $('#btnTheme').addEventListener('click', nextTheme);
     $('#btnBell').addEventListener('click', showAnnouncement);
+    $('#btnSearch').addEventListener('click', openSearch);
+    $('#searchClose').addEventListener('click', closeSearch);
+    $('#searchModal').addEventListener('click', (e) => { if (e.target === $('#searchModal')) closeSearch(); });
+    $('#searchGo').addEventListener('click', runSearch);
+    $('#searchInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+    });
+    $('#exportChat').addEventListener('click', exportChat);
+    $('#checkinSubmit').addEventListener('click', submitCheckin);
+    $('#checkinMoods').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-checkin-mood]');
+      if (!btn) return;
+      state.checkinPick = btn.dataset.checkinMood;
+      $$('#checkinMoods [data-checkin-mood]').forEach((b) => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+    });
     $('#btnSide').addEventListener('click', openSide);
     $('#sideClose').addEventListener('click', closeSide);
     $('#sideBackdrop').addEventListener('click', closeSide);
@@ -351,6 +407,16 @@
       });
     });
 
+    $$('#replyStyle button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        $$('#replyStyle button').forEach((b) => b.classList.toggle('active', b === btn));
+        if (state.user) {
+          state.user.preferences = Object.assign({}, state.user.preferences, { reply_style: btn.dataset.value });
+        }
+        saveProfileField({ reply_style: btn.dataset.value }, '她说话的节奏已经调好');
+      });
+    });
+
     $$('.accent-dot').forEach((dot) => {
       dot.addEventListener('click', () => {
         const color = dot.dataset.accent;
@@ -383,7 +449,10 @@
       if (e.detail && e.detail.ban) showBan(e.detail.ban);
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeSide();
+      if (e.key === 'Escape') {
+        closeSide();
+        closeSearch();
+      }
     });
   }
 
@@ -522,6 +591,7 @@
     const isUser = m.role === 'user';
     const proactive = m.role === 'proactive';
     const gesture = m.meta && (m.meta.gesture || m.meta.gesture_label);
+    const checkinMood = m.meta && m.meta.checkin;
     const gestureIcon = GESTURE_ICON[m.meta && m.meta.gesture] || 'hand';
     const gestureName = (m.meta && m.meta.gesture_label) || GESTURE_NAME[m.meta && m.meta.gesture] || '';
     const time = UI.formatTime(m.created_at);
@@ -529,6 +599,7 @@
       (isUser ? '' : '<span class="msg-avatar"><img src="' + AVATAR + '" alt=""></span>') +
       '<div class="msg-col">' +
         (proactive ? '<span class="proactive-tag">' + UI.icon('sparkles', 12) + '她主动来找你</span>' : '') +
+        (checkinMood ? '<span class="msg-gesture-tag checkin-tag">' + UI.icon('calendar', 12) + '心情签到 · ' + UI.escapeHTML(checkinMood) + '</span>' : '') +
         (gesture ? '<span class="msg-gesture-tag">' + UI.icon(gestureIcon, 12) + UI.escapeHTML(gestureName || '动作') + '</span>' : '') +
         '<div class="msg-bubble">' + UI.escapeHTML(m.content) + '</div>' +
         '<div class="msg-meta">' +
@@ -896,6 +967,12 @@
       '<strong>' + UI.escapeHTML(String(c.value)) + '</strong><span>' + c.label + '</span></div>'
     ).join('');
 
+    if (data.checkin) {
+      state.checkin = data.checkin;
+      renderCheckin();
+    }
+    renderBadges(data.achievements || []);
+
     $('#valenceChart').innerHTML = chartSVG(data.days || []);
     renderBars('#moodDist', (data.distribution || []).map((d) => ({ label: d.label, value: d.value })));
     renderBars('#interactionList', (data.interactions || []).map((d) => ({
@@ -1044,9 +1121,11 @@
   async function focusMessage(id) {
     switchView('chat');
     let row = findRow(id);
-    if (!row) {
+    let guard = 0;
+    while (!row && state.hasMore && guard < 8) {
       await loadMore();
       row = findRow(id);
+      guard++;
     }
     if (!row) {
       UI.toast('这条回忆还在更早的地方，往上翻翻看');
@@ -1059,6 +1138,170 @@
 
   function findRow(id) {
     return document.querySelector('.msg-row[data-id="' + id + '"]');
+  }
+
+  /* =========================================================
+     每日签到 / 搜索 / 导出 / 徽章
+     ========================================================= */
+  function renderCheckin() {
+    const data = state.checkin || {};
+    const moods = state.checkinMoods || [];
+    const todayMood = data.today ? data.today.mood : '';
+    if (!state.checkinPick) state.checkinPick = todayMood || '';
+    const box = $('#checkinMoods');
+    if (box && moods.length) {
+      box.innerHTML = moods.map((m) =>
+        '<button class="checkin-mood" type="button" data-checkin-mood="' + UI.escapeHTML(m.mood) + '" aria-pressed="' + (state.checkinPick === m.mood ? 'true' : 'false') + '">' +
+          '<span class="checkin-mood-icon">' + UI.icon(m.icon, 16) + '</span>' +
+          '<span>' + UI.escapeHTML(m.mood) + '</span>' +
+        '</button>'
+      ).join('');
+    }
+    const note = $('#checkinNote');
+    if (note && data.today && data.today.note && !note.value) note.value = data.today.note;
+    const streak = $('#checkinStreak');
+    if (streak) {
+      if (data.streak > 0) {
+        streak.hidden = false;
+        streak.innerHTML = UI.icon('zap', 12) + '<b>' + data.streak + '</b> 天';
+      } else {
+        streak.hidden = true;
+      }
+    }
+    const week = $('#checkinWeek');
+    if (week) {
+      const recent = data.recent || [];
+      week.innerHTML = recent.map((d) => {
+        const m = moods.find((x) => x.mood === d.mood);
+        return '<div class="checkin-day' + (d.mood ? ' filled' : '') + '" title="' + UI.escapeHTML(d.day + (d.mood ? ' · ' + d.mood : ' · 未记录')) + '">' +
+          '<span class="checkin-dot">' + (m ? UI.icon(m.icon, 12) : '<i></i>') + '</span>' +
+          '<small>' + UI.escapeHTML(d.day) + '</small>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  async function submitCheckin() {
+    if (!state.checkinPick) return UI.toast('先选一个今天的心情吧', 'warn');
+    const btn = $('#checkinSubmit');
+    btn.disabled = true;
+    try {
+      const note = $('#checkinNote').value.trim();
+      const data = await LumiAPI.request('checkin', { mood: state.checkinPick, note: note });
+      state.checkin = data.checkin || state.checkin;
+      if (data.state) setMood(data.state);
+      if (data.message) {
+        if (!state.messages.some((m) => Number(m.id) === Number(data.message.id))) state.messages.push(data.message);
+        renderMessages();
+        scrollBottom();
+      }
+      renderCheckin();
+      UI.toast(data.reply || '今天的心情，我收好了', 'success');
+      if (prefs().sound !== false) UI.chime('received');
+    } catch (err) {
+      UI.toast(err.message || '没能记下来', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function openSearch() {
+    const modal = $('#searchModal');
+    if (!modal) return;
+    modal.classList.add('open');
+    const box = $('#searchResults');
+    if (box && !box.dataset.touched) {
+      box.innerHTML = '<div class="search-empty">输入关键词，把你们说过的话翻出来。</div>';
+    }
+    setTimeout(() => {
+      const input = $('#searchInput');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 180);
+  }
+
+  function closeSearch() {
+    const modal = $('#searchModal');
+    if (modal) modal.classList.remove('open');
+  }
+
+  async function runSearch() {
+    const q = $('#searchInput').value.trim();
+    if (!q) return UI.toast('输入几个字再找吧', 'warn');
+    const box = $('#searchResults');
+    box.dataset.touched = '1';
+    box.innerHTML = '<div class="search-empty">正在翻…</div>';
+    try {
+      const data = await LumiAPI.request('searchMessages', { q: q });
+      renderSearchResults(data.items || [], q);
+    } catch (err) {
+      box.innerHTML = '<div class="search-empty">' + UI.escapeHTML(err.message || '搜索没能完成') + '</div>';
+    }
+  }
+
+  function renderSearchResults(items, q) {
+    const box = $('#searchResults');
+    if (!box) return;
+    if (!items.length) {
+      box.innerHTML = '<div class="search-empty">没有找到「' + UI.escapeHTML(q) + '」。换一个词试试。</div>';
+      return;
+    }
+    box.innerHTML = items.map((m) =>
+      '<button class="search-item" type="button" data-jump="' + m.id + '">' +
+        '<span class="search-who ' + (m.role === 'user' ? 'me' : 'her') + '">' + (m.role === 'user' ? '我' : '她') + '</span>' +
+        '<p>' + UI.escapeHTML(m.content) + '</p>' +
+        '<time>' + UI.formatDateTime(m.created_at) + '</time>' +
+      '</button>'
+    ).join('');
+    box.querySelectorAll('[data-jump]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.jump);
+        closeSearch();
+        focusMessage(id);
+      });
+    });
+  }
+
+  async function exportChat() {
+    const btn = $('#exportChat');
+    btn.disabled = true;
+    try {
+      const data = await LumiAPI.request('exportChat', {}, { timeout: 30000 });
+      const blob = new Blob([data.content || ''], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename || '心屿对话.md';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      UI.toast('已导出 ' + (data.count || 0) + ' 条对话', 'success');
+    } catch (err) {
+      UI.toast(err.message || '导出没能完成', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function renderBadges(list) {
+    const box = $('#badgeGrid');
+    if (!box) return;
+    if (!list || !list.length) {
+      box.innerHTML = '<div class="chart-empty">徽章会在你们走过之后出现</div>';
+      return;
+    }
+    box.innerHTML = list.map((b) =>
+      '<div class="badge' + (b.unlocked ? ' unlocked' : '') + '">' +
+        '<span class="badge-icon">' + UI.icon(b.icon || 'sparkles', 18) + '</span>' +
+        '<div class="badge-copy"><strong>' + UI.escapeHTML(b.label) + '</strong><small>' + UI.escapeHTML(b.desc) + '</small></div>' +
+        (b.unlocked
+          ? '<span class="badge-mark">' + UI.icon('check', 12) + '</span>'
+          : '<span class="badge-mark locked">' + UI.icon('lock', 12) + '</span>') +
+      '</div>'
+    ).join('');
   }
 
   /* =========================================================
@@ -1187,6 +1430,7 @@
     document.body.classList.toggle('reduce-motion', !!prefs.reduce_motion);
     $('#fontSizeValue').textContent = u.font_size || 15;
     $$('#bubbleStyle button').forEach((b) => b.classList.toggle('active', b.dataset.value === (u.bubble_style || 'soft')));
+    $$('#replyStyle button').forEach((b) => b.classList.toggle('active', b.dataset.value === (prefs.reply_style || 'balanced')));
     syncThemeUI();
   }
 
@@ -1204,7 +1448,8 @@
       theme: state.currentTheme,
       accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
       bubble_style: document.body.dataset.bubble || 'soft',
-      font_size: parseInt(getComputedStyle(document.body).getPropertyValue('--chat-size'), 10) || 15
+      font_size: parseInt(getComputedStyle(document.body).getPropertyValue('--chat-size'), 10) || 15,
+      reply_style: (state.user && state.user.preferences && state.user.preferences.reply_style) || 'balanced'
     };
   }
 

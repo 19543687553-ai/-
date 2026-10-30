@@ -29,6 +29,10 @@ try {
         case 'history':                lumi_action_history(); break;
         case 'markRead':               lumi_action_mark_read(); break;
         case 'insights':               lumi_action_insights(); break;
+        case 'checkin':                lumi_action_checkin(); break;
+        case 'checkinToday':           lumi_action_checkin_today(); break;
+        case 'searchMessages':         lumi_action_search_messages(); break;
+        case 'exportChat':             lumi_action_export_chat(); break;
         case 'pinMessage':             lumi_action_pin_message(); break;
         case 'feedbackCreate':         lumi_action_feedback_create(); break;
         case 'feedbackList':           lumi_action_feedback_list(); break;
@@ -312,6 +316,8 @@ function lumi_action_me(): void
         'model_configured' => lumi_model_config()['configured'],
         'app_name' => lumi_setting('app_name', '心屿'),
         'personas' => lumi_persona_catalog(),
+        'checkin' => lumi_checkin_summary((int)$user['id']),
+        'checkin_moods' => lumi_checkin_catalog(),
         'server_time' => time(),
     ]);
 }
@@ -398,6 +404,13 @@ function lumi_action_update_profile(): void
             lumi_err('这个人格还不存在');
         }
         $existing['persona_id'] = $personaId;
+    }
+    $replyStyle = (string)lumi_param('reply_style', '');
+    if ($replyStyle !== '') {
+        if (!in_array($replyStyle, ['brief', 'balanced', 'deep'], true)) {
+            lumi_err('这个回复节奏还不支持');
+        }
+        $existing['reply_style'] = $replyStyle;
     }
     $fields[] = 'settings=?';
     $params[] = json_encode($existing, JSON_UNESCAPED_UNICODE);
@@ -732,7 +745,7 @@ function lumi_action_gesture(): void
 {
     $user = lumi_require_user();
     $type = (string)lumi_param('type', 'hug');
-    if (!in_array($type, ['hug', 'headpat', 'flower', 'hand', 'warm', 'kiss', 'tea'], true)) {
+    if (!in_array($type, ['hug', 'headpat', 'flower', 'hand', 'warm', 'kiss', 'tea', 'sing', 'star'], true)) {
         lumi_err('这个动作还不会做');
     }
     lumi_rate_limit('gesture:' . (int)$user['id'], 20, 60);
@@ -913,6 +926,20 @@ function lumi_action_insights(): void
     $totalMessages = (int)$pdo->query("SELECT COUNT(*) FROM messages WHERE user_id=" . $userId)->fetchColumn();
     $todayMessages = (int)$pdo->query("SELECT COUNT(*) FROM messages WHERE user_id=" . $userId . " AND created_at>=" . strtotime('today'))->fetchColumn();
 
+    $stats = ['total_messages' => $totalMessages, 'today_messages' => $todayMessages, 'streak_days' => (int)$user['streak_days']];
+    $achievements = [];
+    $badges = [
+        ['id' => 'first_word', 'label' => '第一次开口', 'desc' => '你愿意把第一句话交给这里', 'icon' => 'sparkles', 'unlocked' => $totalMessages > 0],
+        ['id' => 'hundred', 'label' => '说过一百句', 'desc' => '一百句之后，彼此都熟悉了一点', 'icon' => 'message', 'unlocked' => $totalMessages >= 100],
+        ['id' => 'seven', 'label' => '七日之约', 'desc' => '连续七天，没有把对方弄丢', 'icon' => 'zap', 'unlocked' => (int)$user['streak_days'] >= 7],
+        ['id' => 'heartlink', 'label' => '心动的形状', 'desc' => '亲密度越过 65 的那一天', 'icon' => 'heart', 'unlocked' => (int)$user['affection'] >= 65],
+        ['id' => 'collector', 'label' => '回忆收藏家', 'desc' => '收藏了三个以上想留住的瞬间', 'icon' => 'bookmark', 'unlocked' => count($pinned) >= 3],
+        ['id' => 'first_touch', 'label' => '第一次靠近', 'desc' => '从一个动作开始，距离变短了', 'icon' => 'hand', 'unlocked' => count($interactions) > 0],
+    ];
+    foreach ($badges as $badge) {
+        $achievements[] = $badge;
+    }
+
     lumi_ok([
         'state' => $state,
         'days' => array_values($days),
@@ -921,7 +948,164 @@ function lumi_action_insights(): void
         'pinned' => $pinned,
         'milestones' => $milestones,
         'latest' => $latestRow ? lumi_message_row($latestRow) : null,
-        'stats' => ['total_messages' => $totalMessages, 'today_messages' => $todayMessages, 'streak_days' => (int)$user['streak_days']],
+        'achievements' => $achievements,
+        'checkin' => lumi_checkin_summary($userId),
+        'stats' => $stats,
+    ]);
+}
+
+function lumi_checkin_summary(int $userId): array
+{
+    $pdo = lumi_db();
+    $todayStart = strtotime('today');
+    $st = $pdo->prepare("SELECT id, mood, note, created_at FROM checkins WHERE user_id=? AND created_at>=? ORDER BY id DESC LIMIT 1");
+    $st->execute([$userId, $todayStart]);
+    $today = $st->fetch() ?: null;
+
+    $st = $pdo->prepare("SELECT strftime('%Y-%m-%d', created_at, 'unixepoch', '+8 hours') d, mood FROM checkins WHERE user_id=? AND created_at>=? ORDER BY id DESC");
+    $st->execute([$userId, strtotime('-30 days midnight')]);
+    $byDay = [];
+    foreach ($st->fetchAll() as $row) {
+        if (!isset($byDay[$row['d']])) {
+            $byDay[$row['d']] = $row['mood'];
+        }
+    }
+
+    $recent = [];
+    for ($i = 6; $i >= 0; $i--) {
+        $date = date('Y-m-d', strtotime("-{$i} day"));
+        $recent[] = ['date' => $date, 'day' => date('m-d', strtotime($date)), 'mood' => $byDay[$date] ?? ''];
+    }
+
+    $streak = 0;
+    $cursor = strtotime('today');
+    if (!isset($byDay[date('Y-m-d', $cursor)])) {
+        $cursor = strtotime('-1 day');
+    }
+    while (isset($byDay[date('Y-m-d', $cursor)])) {
+        $streak++;
+        $cursor = strtotime('-1 day', $cursor);
+        if ($streak > 365) break;
+    }
+
+    return [
+        'today' => $today ? ['id' => (int)$today['id'], 'mood' => $today['mood'], 'note' => $today['note'], 'created_at' => (int)$today['created_at']] : null,
+        'recent' => $recent,
+        'streak' => $streak,
+        'total' => count($byDay),
+    ];
+}
+
+function lumi_action_checkin(): void
+{
+    $user = lumi_require_user();
+    $mood = (string)lumi_param('mood', '');
+    $moods = lumi_checkin_moods();
+    if (!array_key_exists($mood, $moods)) {
+        lumi_err('先选一个今天的心情吧');
+    }
+    $note = lumi_clean_text((string)lumi_param('note', ''), 120);
+    lumi_rate_limit('checkin:' . (int)$user['id'], 8, 86400);
+
+    $user = lumi_mood_decay($user);
+    $cfg = $moods[$mood];
+    $user['mood_valence'] = lumi_clamp((int)$user['mood_valence'] + (int)$cfg['valence'], -100, 100);
+    $user['energy'] = lumi_clamp((int)$user['energy'] + (int)$cfg['energy']);
+    $user['affection'] = lumi_clamp((int)$user['affection'] + (int)$cfg['affection']);
+    $user['sadness'] = lumi_clamp((int)$user['sadness'] + (int)$cfg['sadness']);
+    $user['anger'] = lumi_clamp((int)$user['anger'] + (int)$cfg['anger']);
+    $user['mood_label'] = lumi_mood_label($user);
+    $user['mood_updated_at'] = time();
+    lumi_db()->prepare("UPDATE users SET mood_valence=?, energy=?, affection=?, sadness=?, anger=?, mood_label=?, mood_updated_at=?, updated_at=? WHERE id=?")
+        ->execute([
+            $user['mood_valence'], $user['energy'], $user['affection'], $user['sadness'], $user['anger'],
+            $user['mood_label'], time(), time(), (int)$user['id']
+        ]);
+    lumi_db()->prepare("INSERT INTO checkins (user_id, mood, note, valence, created_at) VALUES (?, ?, ?, ?, ?)")
+        ->execute([(int)$user['id'], $mood, $note, (int)$user['mood_valence'], time()]);
+
+    $fresh = lumi_db()->query("SELECT * FROM users WHERE id=" . (int)$user['id'])->fetch();
+    $conversationId = lumi_current_conversation_id((int)$user['id']);
+    $reply = lumi_checkin_reply($fresh, $mood);
+    $saved = lumi_save_message((int)$user['id'], $conversationId, 'assistant', $reply, lumi_mood_label($fresh), 0, true, [
+        'checkin' => $mood,
+        'note' => $note,
+    ]);
+    lumi_record_mood($fresh, 'checkin', true);
+    lumi_touch_user((int)$user['id']);
+
+    $row = lumi_db()->query("SELECT * FROM messages WHERE id=" . (int)$saved['id'])->fetch();
+    lumi_ok([
+        'conversation_id' => $conversationId,
+        'message' => lumi_message_row($row),
+        'state' => lumi_public_state($fresh),
+        'checkin' => lumi_checkin_summary((int)$user['id']),
+        'reply' => $reply,
+    ], '今天的心情，我收好了');
+}
+
+function lumi_action_checkin_today(): void
+{
+    $user = lumi_require_user();
+    lumi_ok([
+        'checkin' => lumi_checkin_summary((int)$user['id']),
+        'moods' => lumi_checkin_catalog(),
+        'state' => lumi_public_state($user),
+    ]);
+}
+
+function lumi_action_search_messages(): void
+{
+    $user = lumi_require_user();
+    $q = lumi_clean_text((string)lumi_param('q', ''), 40);
+    if (mb_strlen($q) < 1) {
+        lumi_err('想找哪句话？先输入几个字');
+    }
+    $st = lumi_db()->prepare("SELECT * FROM messages WHERE user_id=? AND role IN ('user','assistant','proactive') AND content LIKE ? ORDER BY id DESC LIMIT 30");
+    $st->execute([(int)$user['id'], '%' . $q . '%']);
+    $items = array_map('lumi_message_row', $st->fetchAll());
+    lumi_ok(['items' => $items, 'q' => $q]);
+}
+
+function lumi_action_export_chat(): void
+{
+    $user = lumi_require_user();
+    $userId = (int)$user['id'];
+    $st = lumi_db()->prepare("SELECT role, content, created_at FROM messages WHERE user_id=? AND role IN ('user','assistant','proactive') ORDER BY id ASC LIMIT 4000");
+    $st->execute([$userId]);
+    $rows = $st->fetchAll();
+
+    $name = (string)$user['companion_name'] ?: '小屿';
+    $nickname = (string)$user['nickname'] ?: (string)$user['username'];
+    $lines = [
+        '# 与' . $name . '的对话',
+        '',
+        '> 导出时间：' . lumi_now_text(),
+        '> 共 ' . count($rows) . ' 条消息',
+        '',
+    ];
+    $lastDay = '';
+    foreach ($rows as $row) {
+        $day = date('Y-m-d', (int)$row['created_at']);
+        if ($day !== $lastDay) {
+            $lines[] = '';
+            $lines[] = '## ' . $day;
+            $lines[] = '';
+            $lastDay = $day;
+        }
+        $who = $row['role'] === 'user' ? $nickname : $name;
+        if ($row['role'] === 'proactive') {
+            $who = $name . '（主动）';
+        }
+        $lines[] = '**' . $who . '** · ' . date('H:i', (int)$row['created_at']);
+        $lines[] = '';
+        $lines[] = str_replace("\n", "\n\n", (string)$row['content']);
+        $lines[] = '';
+    }
+    lumi_ok([
+        'filename' => '心屿-' . $nickname . '-' . date('Ymd') . '.md',
+        'content' => implode("\n", $lines),
+        'count' => count($rows),
     ]);
 }
 

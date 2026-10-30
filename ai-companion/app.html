@@ -50,6 +50,7 @@
           </div>
           <div class="chat-head-actions">
             <span class="streak-pill" id="streakPill" hidden><span data-icon="zap" data-size="13"></span><b>0</b> 天</span>
+            <button class="btn btn-icon" id="btnSearch" type="button" data-icon="search" data-size="18" aria-label="找回一句话" title="找回一句话"></button>
             <button class="btn btn-icon" id="btnBell" type="button" data-icon="bell" data-size="18" aria-label="公告" title="公告"></button>
             <button class="btn btn-icon" id="btnTheme" type="button" data-icon="sun" data-size="18" aria-label="切换氛围" title="切换氛围"></button>
             <button class="btn btn-icon side-toggle" id="btnSide" type="button" data-icon="layers" data-size="18" aria-label="情绪面板" title="情绪面板"></button>
@@ -80,6 +81,8 @@
             <button class="gesture-btn" data-gesture="warm" type="button"><span data-icon="layers" data-size="15"></span>披外套</button>
             <button class="gesture-btn" data-gesture="kiss" type="button"><span data-icon="kiss" data-size="15"></span>亲亲</button>
             <button class="gesture-btn" data-gesture="tea" type="button"><span data-icon="tea" data-size="15"></span>递热茶</button>
+            <button class="gesture-btn" data-gesture="sing" type="button"><span data-icon="volume" data-size="15"></span>唱歌</button>
+            <button class="gesture-btn" data-gesture="star" type="button"><span data-icon="sparkles" data-size="15"></span>看星星</button>
           </div>
           <form class="composer" id="chatForm" autocomplete="off">
             <div class="composer-inner">
@@ -105,7 +108,23 @@
           <button class="btn btn-ghost btn-sm" id="refreshInsights" type="button"><span data-icon="refresh" data-size="15"></span>刷新</button>
         </header>
         <div class="view-scroll">
+          <div class="card checkin-card">
+            <div class="card-head">
+              <div><h4>今天的你</h4><p>给此刻的心情留一个小记号，她会记着</p></div>
+              <span class="checkin-streak" id="checkinStreak" hidden></span>
+            </div>
+            <div class="checkin-moods" id="checkinMoods"></div>
+            <div class="checkin-note-row">
+              <input class="input" id="checkinNote" maxlength="120" placeholder="想补一句吗？可选">
+              <button class="btn btn-primary btn-sm" id="checkinSubmit" type="button">记下来</button>
+            </div>
+            <div class="checkin-week" id="checkinWeek"></div>
+          </div>
           <div class="stat-grid" id="insightStats"></div>
+          <div class="card">
+            <div class="card-head"><div><h4>一起解锁的徽章</h4><p>不是任务，只是你们走过的证据</p></div></div>
+            <div class="badge-grid" id="badgeGrid"></div>
+          </div>
           <div class="card chart-card">
             <div class="card-head">
               <div><h4>最近 14 天</h4><p>情绪底色与亲密度的变化</p></div>
@@ -138,6 +157,7 @@
             <h2>收藏的回忆</h2>
             <p>那些你想留住的句子。她也会记得。</p>
           </div>
+          <button class="btn btn-ghost btn-sm" id="exportChat" type="button"><span data-icon="download" data-size="15"></span>导出对话</button>
         </header>
         <div class="view-scroll">
           <div class="memory-grid" id="memoryGrid"></div>
@@ -156,6 +176,7 @@
         <div class="view-scroll settings-scroll">
           <div class="card persona-card-wrap">
             <div class="card-head"><div><h4>她的性格底色</h4><p>选一种陪你的方式，她会一直记得</p></div></div>
+            <div class="persona-filters" id="personaFilters"></div>
             <div class="persona-grid" id="personaGrid"></div>
             <p class="persona-note" id="personaNote">正在读取人格预设…</p>
           </div>
@@ -238,6 +259,14 @@
                 <button class="btn btn-icon btn-sm" data-font="-1" type="button">A－</button>
                 <b id="fontSizeValue">15</b>
                 <button class="btn btn-icon btn-sm" data-font="1" type="button">A＋</button>
+              </div>
+            </div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>她说话的节奏</strong><span>短一点，还是愿意多说一点</span></div>
+              <div class="segmented" id="replyStyle">
+                <button data-value="brief" type="button">简短</button>
+                <button data-value="balanced" type="button">适中</button>
+                <button data-value="deep" type="button">深入</button>
               </div>
             </div>
           </div>
@@ -348,6 +377,21 @@
         <span>你在这里说的话，只属于你们。</span>
       </div>
     </aside>
+  </div>
+
+  <!-- 搜索弹窗 -->
+  <div class="modal-backdrop" id="searchModal">
+    <div class="modal-panel search-panel" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
+      <div class="modal-head">
+        <div><h3 id="searchTitle">找回一句话</h3><p>搜你们说过的内容，她帮你翻出来</p></div>
+        <button class="modal-close" id="searchClose" type="button" aria-label="关闭" data-icon="x" data-size="17"></button>
+      </div>
+      <div class="search-bar">
+        <input class="input" id="searchInput" maxlength="40" placeholder="比如：抱抱、晚安、领导" autocomplete="off">
+        <button class="btn btn-primary btn-sm" id="searchGo" type="button">搜索</button>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
   </div>
 
   <!-- 封禁弹窗 -->
