@@ -43,6 +43,7 @@
               <div class="person-name-row">
                 <h1 id="companionName">小屿</h1>
                 <span class="mood-chip" id="moodChip">正在醒来</span>
+                <span class="persona-chip" id="personaChip" hidden></span>
               </div>
               <p class="person-sub" id="personSub">正在连接心屿</p>
             </div>
@@ -77,6 +78,8 @@
             <button class="gesture-btn" data-gesture="flower" type="button"><span data-icon="flower" data-size="15"></span>送花</button>
             <button class="gesture-btn" data-gesture="hand" type="button"><span data-icon="hand" data-size="15"></span>牵手</button>
             <button class="gesture-btn" data-gesture="warm" type="button"><span data-icon="layers" data-size="15"></span>披外套</button>
+            <button class="gesture-btn" data-gesture="kiss" type="button"><span data-icon="kiss" data-size="15"></span>亲亲</button>
+            <button class="gesture-btn" data-gesture="tea" type="button"><span data-icon="tea" data-size="15"></span>递热茶</button>
           </div>
           <form class="composer" id="chatForm" autocomplete="off">
             <div class="composer-inner">
@@ -151,6 +154,12 @@
           </div>
         </header>
         <div class="view-scroll settings-scroll">
+          <div class="card persona-card-wrap">
+            <div class="card-head"><div><h4>她的性格底色</h4><p>选一种陪你的方式，她会一直记得</p></div></div>
+            <div class="persona-grid" id="personaGrid"></div>
+            <p class="persona-note" id="personaNote">正在读取人格预设…</p>
+          </div>
+
           <div class="card">
             <div class="card-head"><div><h4>关于你</h4><p>她该怎么称呼你，怎么理解你</p></div></div>
             <div class="form-grid">
@@ -163,7 +172,7 @@
                 <input class="input" id="setCompanionName" maxlength="12" placeholder="小屿">
               </div>
               <div class="field span-2">
-                <label class="field-label" for="setPersona">她的性格底色 <span class="field-hint">最多 200 字</span></label>
+                <label class="field-label" for="setPersona">性格微调 <span class="field-hint">最多 200 字，可留空</span></label>
                 <textarea class="input" id="setPersona" maxlength="200" placeholder="例如：温柔但不讨好，会闹小脾气，也会在沉默时主动开口。"></textarea>
               </div>
               <div class="field span-2">
@@ -202,7 +211,7 @@
           </div>
 
           <div class="card">
-            <div class="card-head"><div><h4>氛围与阅读</h4><p>四种氛围，随时可以换</p></div></div>
+            <div class="card-head"><div><h4>氛围与阅读</h4><p>六种氛围，随时可以换</p></div></div>
             <div class="theme-grid" id="settingThemes"></div>
             <div class="pref-row">
               <div class="pref-copy"><strong>点缀色</strong><span>让这里更像你的颜色</span></div>

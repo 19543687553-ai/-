@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '1.2.0';
+const LUMI_VERSION = '1.3.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -759,10 +759,16 @@ function lumi_public_state(array $user): array
     ];
 }
 
+function lumi_theme_ids(): array
+{
+    return ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'cream'];
+}
+
 function lumi_public_user(array $user): array
 {
     $settings = json_decode((string)($user['settings'] ?? '{}'), true);
     if (!is_array($settings)) $settings = [];
+    $personaId = (string)($settings['persona_id'] ?? 'gentle');
     return [
         'id' => (int)$user['id'],
         'username' => $user['username'],
@@ -779,6 +785,7 @@ function lumi_public_user(array $user): array
         'font_size' => (int)$user['font_size'],
         'companion_name' => $user['companion_name'],
         'companion_persona' => $user['companion_persona'],
+        'persona_id' => $personaId,
         'status' => $user['status'],
         'streak_days' => (int)$user['streak_days'],
         'total_messages' => (int)$user['total_messages'],

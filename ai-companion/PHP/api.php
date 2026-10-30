@@ -195,7 +195,7 @@ function lumi_action_register(): void
 
     $now = time();
     $theme = (string)lumi_param('theme', (string)lumi_setting('default_theme', 'dusk'));
-    if (!in_array($theme, ['dusk', 'dawn', 'sakura', 'forest'], true)) {
+    if (!in_array($theme, lumi_theme_ids(), true)) {
         $theme = (string)lumi_setting('default_theme', 'dusk');
     }
     $welcome = str_replace('{{nickname}}', $nickname, (string)lumi_setting('welcome_message', '你终于来啦。'));
@@ -311,6 +311,7 @@ function lumi_action_me(): void
         'unread_count' => lumi_unread_count((int)$user['id']),
         'model_configured' => lumi_model_config()['configured'],
         'app_name' => lumi_setting('app_name', '心屿'),
+        'personas' => lumi_persona_catalog(),
         'server_time' => time(),
     ]);
 }
@@ -364,7 +365,7 @@ function lumi_action_update_profile(): void
     $params[] = $birthday;
 
     $theme = (string)lumi_param('theme', $user['theme']);
-    if (!in_array($theme, ['dusk', 'dawn', 'sakura', 'forest'], true)) $theme = 'dusk';
+    if (!in_array($theme, lumi_theme_ids(), true)) $theme = 'dusk';
     $fields[] = 'theme=?';
     $params[] = $theme;
 
@@ -390,6 +391,13 @@ function lumi_action_update_profile(): void
                 $existing[$key] = (bool)$preferences[$key];
             }
         }
+    }
+    $personaId = (string)lumi_param('persona_id', '');
+    if ($personaId !== '') {
+        if (!array_key_exists($personaId, lumi_personas())) {
+            lumi_err('这个人格还不存在');
+        }
+        $existing['persona_id'] = $personaId;
     }
     $fields[] = 'settings=?';
     $params[] = json_encode($existing, JSON_UNESCAPED_UNICODE);
@@ -724,7 +732,7 @@ function lumi_action_gesture(): void
 {
     $user = lumi_require_user();
     $type = (string)lumi_param('type', 'hug');
-    if (!in_array($type, ['hug', 'headpat', 'flower', 'hand', 'warm'], true)) {
+    if (!in_array($type, ['hug', 'headpat', 'flower', 'hand', 'warm', 'kiss', 'tea'], true)) {
         lumi_err('这个动作还不会做');
     }
     lumi_rate_limit('gesture:' . (int)$user['id'], 20, 60);
@@ -1254,7 +1262,7 @@ function lumi_action_admin_update_user(): void
     }
     if (lumi_param('theme', null) !== null) {
         $theme = (string)lumi_param('theme');
-        if (in_array($theme, ['dusk', 'dawn', 'sakura', 'forest'], true)) {
+        if (in_array($theme, lumi_theme_ids(), true)) {
             $fields[] = 'theme=?';
             $params[] = $theme;
         }
@@ -1578,6 +1586,9 @@ function lumi_action_admin_save_settings(): void
             if (is_bool($value)) $value = $value ? '1' : '0';
             if (is_array($value)) continue;
             $value = lumi_clean_text((string)$value, $key === 'welcome_message' || $key === 'app_tagline' ? 1000 : 200);
+            if ($key === 'default_theme' && !in_array($value, lumi_theme_ids(), true)) {
+                continue;
+            }
             lumi_set_setting($key, $value);
             $changed[] = $key;
         }

@@ -6,10 +6,10 @@
 
   const PREFIX = (window.LUMI_CONFIG && window.LUMI_CONFIG.storagePrefix) || 'xinyu.';
   const AVATAR = 'assets/companion.jpg';
-  const THEME_ORDER = ['dusk', 'dawn', 'sakura', 'forest'];
-  const GESTURE_ICON = { hug: 'heart', headpat: 'hand', flower: 'flower', hand: 'hand', warm: 'layers' };
-  const GESTURE_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套' };
-  const INTERACTION_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套' };
+  const THEME_ORDER = ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'cream'];
+  const GESTURE_ICON = { hug: 'heart', headpat: 'hand', flower: 'flower', hand: 'hand', warm: 'layers', kiss: 'kiss', tea: 'tea' };
+  const GESTURE_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶' };
+  const INTERACTION_NAME = { hug: '拥抱', headpat: '摸摸头', flower: '送花', hand: '牵手', warm: '披外套', kiss: '亲亲', tea: '递热茶' };
 
   const MOOD = {
     '开心': { icon: 'smile', a: '#ffd27d', b: '#ffb37a', desc: '眼睛弯弯的，连语气都轻快了一点。' },
@@ -39,7 +39,8 @@
     pollTimer: null,
     banTimer: null,
     view: 'chat',
-    currentTheme: 'dusk'
+    currentTheme: 'dusk',
+    personas: []
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -96,8 +97,11 @@
   async function applyMe(data) {
     state.user = data.user || state.user;
     state.announcement = data.announcement || null;
+    state.personas = Array.isArray(data.personas) ? data.personas : [];
     $('#companionName').textContent = state.user.companion_name || '小屿';
     document.title = '心屿 · ' + (state.user.companion_name || '小屿') + '在等你';
+    buildPersonaGrid();
+    renderPersona();
     if (state.user.theme && THEME_ORDER.indexOf(state.user.theme) >= 0) {
       state.currentTheme = state.user.theme;
       UI.applyTheme(state.currentTheme, '');
@@ -205,6 +209,73 @@
     box.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-theme-choice]');
       if (btn) chooseTheme(btn.dataset.themeChoice);
+    });
+  }
+
+  /* =========================================================
+     人格
+     ========================================================= */
+  function buildPersonaGrid() {
+    const box = $('#personaGrid');
+    if (!box || !state.personas.length) return;
+    if (box.dataset.built === '1') return;
+    box.dataset.built = '1';
+    box.innerHTML = state.personas.map((p) =>
+      '<button class="persona-card" type="button" data-persona="' + UI.escapeHTML(p.id) + '" aria-pressed="false" style="--p-accent:' + (p.accent || 'var(--accent)') + '">' +
+        '<span class="persona-icon">' + UI.icon(p.icon, 18) + '</span>' +
+        '<strong>' + UI.escapeHTML(p.name) + '</strong>' +
+        '<small>' + UI.escapeHTML(p.tagline) + '</small>' +
+        '<em>' + UI.escapeHTML(p.desc) + '</em>' +
+      '</button>'
+    ).join('');
+    box.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-persona]');
+      if (card) choosePersona(card.dataset.persona);
+    });
+    renderPersona();
+  }
+
+  function currentPersona() {
+    const id = (state.user && state.user.persona_id) || 'gentle';
+    return state.personas.find((p) => p.id === id) || null;
+  }
+
+  function renderPersona() {
+    const p = currentPersona();
+    $$('.persona-card').forEach((card) => {
+      card.setAttribute('aria-pressed', p && card.dataset.persona === p.id ? 'true' : 'false');
+    });
+    const chip = $('#personaChip');
+    if (chip) {
+      if (p) {
+        chip.hidden = false;
+        chip.innerHTML = UI.icon(p.icon, 13) + '<span>' + UI.escapeHTML(p.name) + '</span>';
+      } else {
+        chip.hidden = true;
+      }
+    }
+    const note = $('#personaNote');
+    if (note) {
+      note.textContent = p
+        ? '当前人格：' + p.name + ' · ' + p.tagline + '。下方描述可以再微调，她会按这个底色说话。'
+        : '也可以直接写下你希望的性格底色。';
+    }
+  }
+
+  function choosePersona(id) {
+    const p = state.personas.find((x) => x.id === id);
+    if (!p || !state.user) return;
+    state.user.persona_id = id;
+    const area = $('#setPersona');
+    if (area) area.value = p.prompt;
+    renderPersona();
+    const payload = Object.assign(profilePayload(), { persona_id: id, companion_persona: p.prompt });
+    LumiAPI.request('updateProfile', payload).then((data) => {
+      if (data.user) state.user = data.user;
+      renderPersona();
+      UI.toast('已换成「' + p.name + '」的人格', 'success');
+    }).catch((err) => {
+      UI.toast(err.message || '人格没有保存上', 'error');
     });
   }
 
@@ -1102,6 +1173,7 @@
     $('#setNickname').value = u.nickname || '';
     $('#setCompanionName').value = u.companion_name || '';
     $('#setPersona').value = u.companion_persona || '';
+    renderPersona();
     $('#setBio').value = u.bio || '';
     $('#setEmail').value = u.email || '';
     $('#setPhone').value = u.phone || '';
@@ -1123,6 +1195,7 @@
       nickname: $('#setNickname').value.trim(),
       companion_name: $('#setCompanionName').value.trim(),
       companion_persona: $('#setPersona').value.trim(),
+      persona_id: (state.user && state.user.persona_id) || 'gentle',
       bio: $('#setBio').value.trim(),
       email: $('#setEmail').value.trim(),
       phone: $('#setPhone').value.trim(),
@@ -1147,6 +1220,7 @@
       if (data.state) setMood(data.state);
       $('#companionName').textContent = state.user.companion_name || '小屿';
       document.title = '心屿 · ' + (state.user.companion_name || '小屿') + '在等你';
+      renderPersona();
       UI.toast('已经悄悄记下你的偏好了', 'success');
     } catch (err) {
       UI.toast(err.message || '保存失败', 'error');

@@ -263,6 +263,8 @@
     quote: '<path d="M9 11H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6c0 4-2 6-5 6"/><path d="M21 11h-5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6c0 4-2 6-5 6"/>',
     flower: '<circle cx="12" cy="9" r="3"/><path d="M12 6c0-2 1-4 3-4s3 2 3 4-1 3-3 3M12 6C12 4 11 2 9 2S6 4 6 6s1 3 3 3M12 12c0 2 1 3 3 3s3-1 3-3-1-4-3-4M12 12c0 2-1 3-3 3s-3-1-3-3 1-4 3-4"/><path d="M12 15v6"/>',
     tea: '<path d="M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M16 10h2a3 3 0 0 1 0 6h-2"/><path d="M7 3v2M11 3v2"/>',
+    kiss: '<path d="M3 12c3-3 6-4 9-4s6 1 9 4c-3 3-6 4-9 4s-6-1-9-4Z"/><path d="M7 13.6c2.6-1.5 7.4-1.5 10 0"/>',
+    paw: '<circle cx="6.5" cy="10" r="2"/><circle cx="10" cy="6.5" r="2"/><circle cx="14" cy="6.5" r="2"/><circle cx="17.5" cy="10" r="2"/><path d="M12 21c-3.5 0-6-2-6-4.4 0-2.4 2-4.1 3.5-4.1 1 0 1.6.4 2.5 1 .9-.6 1.5-1 2.5-1 1.5 0 3.5 1.7 3.5 4.1C18 19 15.5 21 12 21Z"/>',
     layers: '<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     banUser: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 12.2-4.7"/><path d="m16 19 5-5"/><path d="m16 14 5 5"/>',
@@ -282,7 +284,9 @@
     dusk: { name: '暮色', sub: '傍晚最后一盏灯', accent: '#ffaf9b' },
     dawn: { name: '晨雾', sub: '刚醒来的房间', accent: '#e88566' },
     sakura: { name: '樱夜', sub: '没说完的梦', accent: '#ffb3c7' },
-    forest: { name: '森语', sub: '雨后森林的呼吸', accent: '#a9d8ba' }
+    forest: { name: '森语', sub: '雨后森林的呼吸', accent: '#a9d8ba' },
+    midnight: { name: '星夜', sub: '把心事放得很轻', accent: '#8fb8ff' },
+    cream: { name: '奶油', sub: '被阳光晒暖的午后', accent: '#d99a6c' }
   };
 
   function applyTheme(name, accent) {
@@ -295,7 +299,7 @@
     }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-      const map = { dusk: '#100d16', dawn: '#f4eee8', sakura: '#1a0f16', forest: '#0b1512' };
+      const map = { dusk: '#100d16', dawn: '#f4eee8', sakura: '#1a0f16', forest: '#0b1512', midnight: '#0a1020', cream: '#fbf4e6' };
       meta.setAttribute('content', map[name] || '#100d16');
     }
     window.dispatchEvent(new CustomEvent('lumi:theme', { detail: { theme: name, accent: accent } }));

@@ -11,7 +11,8 @@
 
   const ROLE_TEXT = { superadmin: '超级管理员', admin: '管理员', moderator: '审核员' };
   const STATUS_TEXT = { active: '正常', banned: '封禁中', deleted: '已注销' };
-  const THEME_TEXT = { dusk: '暮色', dawn: '晨雾', sakura: '樱夜', forest: '森语' };
+  const THEME_TEXT = { dusk: '暮色', dawn: '晨雾', sakura: '樱夜', forest: '森语', midnight: '星夜', cream: '奶油' };
+  const THEME_IDS = ['dusk', 'dawn', 'sakura', 'forest', 'midnight', 'cream'];
   const LEVEL_TEXT = { info: '通知', warm: '温柔', important: '重要' };
   const FB_TEXT = { open: '待处理', replied: '已回复', closed: '已关闭' };
   const ROLE_BADGE = { user: '用户', assistant: '陪伴者', proactive: '主动', system: '系统' };
@@ -924,7 +925,7 @@
                   <input class="input" id="setAppName" value="${esc(s.app_name)}"></label>
                 <label class="field"><span class="field-label">默认主题</span>
                   <select id="setDefaultTheme">
-                    ${['dusk', 'dawn', 'sakura', 'forest'].map((t) => `<option value="${t}" ${s.default_theme === t ? 'selected' : ''}>${THEME_TEXT[t]}</option>`).join('')}
+                    ${THEME_IDS.map((t) => `<option value="${t}" ${s.default_theme === t ? 'selected' : ''}>${THEME_TEXT[t]}</option>`).join('')}
                   </select></label>
                 <label class="field span-2"><span class="field-label">一句话标语</span>
                   <input class="input" id="setTagline" value="${esc(s.app_tagline)}"></label>
@@ -1866,7 +1867,7 @@
           <label class="field"><span class="field-label">难过值 0-100</span><input class="input" id="euSadness" type="number" min="0" max="100" value="${esc(st.sadness)}"></label>
           <label class="field"><span class="field-label">精力 0-100</span><input class="input" id="euEnergy" type="number" min="0" max="100" value="${esc(st.energy)}"></label>
           <label class="field"><span class="field-label">主题</span>
-            <select id="euTheme">${['dusk', 'dawn', 'sakura', 'forest'].map((t) => `<option value="${t}" ${u.theme === t ? 'selected' : ''}>${THEME_TEXT[t]}</option>`).join('')}</select></label>
+            <select id="euTheme">${THEME_IDS.map((t) => `<option value="${t}" ${u.theme === t ? 'selected' : ''}>${THEME_TEXT[t]}</option>`).join('')}</select></label>
           <label class="field"><span class="field-label">账号状态</span>
             <select id="euStatus">
               <option value="active" ${u.status === 'active' ? 'selected' : ''}>正常</option>

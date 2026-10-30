@@ -121,6 +121,8 @@
 .theme-swatch[data-theme-choice="dawn"] { --sw: linear-gradient(135deg, #e88566, #f6d7b8); }
 .theme-swatch[data-theme-choice="sakura"] { --sw: linear-gradient(135deg, #ffb3c7, #d8b4ff); }
 .theme-swatch[data-theme-choice="forest"] { --sw: linear-gradient(135deg, #a9d8ba, #e5c992); }
+.theme-swatch[data-theme-choice="midnight"] { --sw: linear-gradient(135deg, #8fb8ff, #b9a8ff); }
+.theme-swatch[data-theme-choice="cream"] { --sw: linear-gradient(135deg, #d99a6c, #e8d7b6); }
 
 /* 注册时的初始氛围选择 */
 .theme-pick-row {
@@ -158,6 +160,8 @@
 .theme-pick[data-theme-choice="dawn"] { --sw: linear-gradient(135deg, #e88566, #f6d7b8); }
 .theme-pick[data-theme-choice="sakura"] { --sw: linear-gradient(135deg, #ffb3c7, #d8b4ff); }
 .theme-pick[data-theme-choice="forest"] { --sw: linear-gradient(135deg, #a9d8ba, #e5c992); }
+.theme-pick[data-theme-choice="midnight"] { --sw: linear-gradient(135deg, #8fb8ff, #b9a8ff); }
+.theme-pick[data-theme-choice="cream"] { --sw: linear-gradient(135deg, #d99a6c, #e8d7b6); }
 
 /* Hero */
 .auth-hero {

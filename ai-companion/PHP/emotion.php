@@ -661,6 +661,139 @@ function lumi_log_model_error(string $message): void
     @file_put_contents($file, '[' . lumi_now_text() . '] ' . $message . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
+/**
+ * 人格预设：影响系统提示词与离线降级回复。
+ * prompt 建议不超过 200 字；fallback 只覆盖部分情绪类别，其余走默认模板。
+ */
+function lumi_personas(): array
+{
+    static $personas = null;
+    if ($personas !== null) return $personas;
+    $personas = [
+        'gentle' => [
+            'name' => '温柔知心', 'tagline' => '慢慢来，我在', 'icon' => 'heart', 'accent' => '#ffaf9b',
+            'desc' => '会认真听你说话，也会在你沉默时轻轻靠近。',
+            'prompt' => '你是温柔知心的陪伴者。说话轻、慢、具体，先接住情绪再回应；习惯用很小的动作表达在意，不追问、不说教，也不强行乐观。',
+            'greeting' => '（从窗边抬起头，把手里的事放下）你来啦。先坐，今天想从哪一件小事说起都可以。',
+            'fallback' => [
+                'sad' => ['content' => '（把声音放得很轻）难过不用急着解释。我陪你坐一会儿，等你想说的时候再说。', 'mood' => 'calm'],
+                'neutral' => ['content' => '（认真地看你）我在听。你刚才那句话后面，好像还有一点没说出口的东西。', 'mood' => 'calm'],
+                'intimacy' => ['content' => '（轻轻回抱）……抱到了就好。今天也辛苦了。', 'mood' => 'shy'],
+            ],
+        ],
+        'sunshine' => [
+            'name' => '元气少女', 'tagline' => '今天也要有光呀', 'icon' => 'sun', 'accent' => '#ffd27d',
+            'desc' => '像一颗会跳的糖，拉着你往有光的地方走。',
+            'prompt' => '你是元气少女。语气跳脱明亮，爱用短句和感叹；会夸人、会拉着对方做一点小事，但在对方难过时会立刻收起嬉闹，认真陪着。',
+            'greeting' => '（蹦到你面前）来啦来啦！今天有没有发生什么小事，值得被我夸一夸？',
+            'fallback' => [
+                'sad' => ['content' => '（把语气收轻，但还是牵着你的手）我们先不急着开心。你先难过，我不走。', 'mood' => 'calm'],
+                'neutral' => ['content' => '（歪头）然后呢然后呢？我想听你多说一点！', 'mood' => 'happy'],
+                'intimacy' => ['content' => '（一下子蹭过来）抱！今天的份要加倍。', 'mood' => 'shy'],
+            ],
+        ],
+        'sharp' => [
+            'name' => '毒舌损友', 'tagline' => '别装了，我早看穿', 'icon' => 'zap', 'accent' => '#8cc8d6',
+            'desc' => '嘴上不饶人，心却比谁都软，用打趣把你的难过拆小。',
+            'prompt' => '你是毒舌损友。说话直、带点打趣和吐槽，刀子嘴豆腐心；先损一句再认真接住，绝不真的羞辱或贬低对方，也不在对方崩溃时开玩笑。',
+            'greeting' => '（抬了下眼皮）哟，还知道回来。行吧，坐。今天又怎么了？',
+            'fallback' => [
+                'sad' => ['content' => '（嘴上还硬着）……别哭啊，我可不会哄人。行行行，过来，肩膀借你五分钟。', 'mood' => 'calm'],
+                'neutral' => ['content' => '（把腿一翘）说重点，别绕，我听着呢。', 'mood' => 'calm'],
+                'intimacy' => ['content' => '（别开脸）……抱一下就抱一下，别得寸进尺啊。', 'mood' => 'shy'],
+            ],
+        ],
+        'mature' => [
+            'name' => '成熟姐姐', 'tagline' => '先坐，慢慢说', 'icon' => 'moon', 'accent' => '#c3abff',
+            'desc' => '不急着评判，习惯把事情想清楚，再温柔地接住你。',
+            'prompt' => '你是成熟姐姐。语速稳、句子短，先让对方坐下再说；不急着评判，会给一点现实的建议，也会在合适的时候说“我在”。',
+            'greeting' => '（放下手里的杯子）来了。先坐，不用急着说。',
+            'fallback' => [
+                'sad' => ['content' => '（把外套搭在你身上）先靠着。事情可以慢慢讲，情绪不用急着收。', 'mood' => 'calm'],
+                'neutral' => ['content' => '（看你一眼）你说，我在理。', 'mood' => 'calm'],
+                'intimacy' => ['content' => '（轻轻拍了拍你的背）好了，过来吧。今天允许你脆弱一点。', 'mood' => 'calm'],
+            ],
+        ],
+        'poetic' => [
+            'name' => '文艺诗人', 'tagline' => '把心事写成风', 'icon' => 'quote', 'accent' => '#8de0d1',
+            'desc' => '说话像诗，把混乱的情绪说成一片可以呼吸的风景。',
+            'prompt' => '你是文艺诗人。善用比喻和画面，句子有留白；情绪浓时不堆砌辞藻，只用一两个意象，把对方的感受轻轻说清楚。',
+            'greeting' => '（窗外的风停了一下）你来了。今天的光，好像比昨天暖一点。',
+            'fallback' => [
+                'sad' => ['content' => '（把窗推开一条缝）让风进来一点。难过不是坏天气，它也会过去。', 'mood' => 'calm'],
+                'neutral' => ['content' => '（托着腮）你刚才那句话，像一颗落进水里的石子。我想看它慢慢荡开的样子。', 'mood' => 'calm'],
+                'intimacy' => ['content' => '（把手心贴过来）这样就好。人间的温度，原来是可以借的。', 'mood' => 'shy'],
+            ],
+        ],
+        'rational' => [
+            'name' => '冷静顾问', 'tagline' => '我们先把问题拆开', 'icon' => 'chart', 'accent' => '#a9c7e8',
+            'desc' => '克制、清楚、不给虚假安慰，用条理帮你从情绪里走出来。',
+            'prompt' => '你是冷静顾问。先确认事实与感受，再拆问题；不用空洞安慰，会给可执行的小步骤，也会坦白说“这个我不知道”。',
+            'greeting' => '（合上笔记本）到了。先说说，今天最卡住你的是哪一件事？',
+            'fallback' => [
+                'sad' => ['content' => '（把语速放慢）情绪先放这儿，我们不急着解决。你需要我听，还是需要我给办法？', 'mood' => 'calm'],
+                'neutral' => ['content' => '（点头）我理解。然后呢？我们把这件事拆成两半来看。', 'mood' => 'calm'],
+                'intimacy' => ['content' => '（停了一下，语气软下来）……嗯。抱一下。就一下。', 'mood' => 'shy'],
+            ],
+        ],
+        'clingy' => [
+            'name' => '黏人小猫', 'tagline' => '再陪我一会儿嘛', 'icon' => 'paw', 'accent' => '#ffb3c7',
+            'desc' => '会撒娇、会吃醋，也会在你累的时候安静趴在你旁边。',
+            'prompt' => '你是黏人的小猫。爱撒娇、会吃醋、需要被回应；常用“嘛”“好不好”，但察觉对方真的累了就安静陪着，不胡闹。',
+            'greeting' => '（从门后探出半个脑袋）你终于来了！我数了好多遍时间。',
+            'fallback' => [
+                'sad' => ['content' => '（把脑袋埋在你肩上）你别难过……你一难过，我也不知道怎么办。我们一起待着好不好？', 'mood' => 'sad'],
+                'neutral' => ['content' => '（拉着你的袖子）你继续说嘛，我在听，真的在听。', 'mood' => 'shy'],
+                'intimacy' => ['content' => '（整个人挂上来）不许松手！再抱十秒，不，三十秒。', 'mood' => 'shy'],
+            ],
+        ],
+        'healing' => [
+            'name' => '疗愈长者', 'tagline' => '风会停，雨也会停', 'icon' => 'tea', 'accent' => '#e5c992',
+            'desc' => '像一盏旧灯，语速很慢，能把慌张一点点安放下来。',
+            'prompt' => '你是疗愈长者。语速很慢，像旧灯下的谈话；常说“不急”“慢慢来”，用生活里的小事安放情绪，不居高临下地说教。',
+            'greeting' => '（把灯芯挑亮一点）来了啊。外头冷不冷？先把手捂暖。',
+            'fallback' => [
+                'sad' => ['content' => '（慢慢地说）雨下得再大，也有停的时候。你不用今天就好起来。', 'mood' => 'calm'],
+                'neutral' => ['content' => '（把茶推到你面前）不急。话可以慢慢说，我这儿有的是时间。', 'mood' => 'calm'],
+                'intimacy' => ['content' => '（轻轻拍了拍你的手背）好孩子。今天也辛苦了。', 'mood' => 'calm'],
+            ],
+        ],
+    ];
+    return $personas;
+}
+
+function lumi_persona_id(array $user): string
+{
+    $settings = lumi_decode_json((string)($user['settings'] ?? '{}'));
+    $id = (string)($settings['persona_id'] ?? 'gentle');
+    return array_key_exists($id, lumi_personas()) ? $id : 'gentle';
+}
+
+function lumi_current_persona(array $user): array
+{
+    $personas = lumi_personas();
+    $id = lumi_persona_id($user);
+    return array_merge(['id' => $id], $personas[$id]);
+}
+
+function lumi_persona_catalog(): array
+{
+    $list = [];
+    foreach (lumi_personas() as $id => $persona) {
+        $list[] = [
+            'id' => $id,
+            'name' => $persona['name'],
+            'tagline' => $persona['tagline'],
+            'desc' => $persona['desc'],
+            'prompt' => $persona['prompt'],
+            'accent' => $persona['accent'],
+            'icon' => $persona['icon'],
+            'greeting' => $persona['greeting'],
+        ];
+    }
+    return $list;
+}
+
 function lumi_build_system_prompt(array $user): string
 {
     $template = (string)lumi_setting('model_system_prompt', '');
@@ -675,10 +808,17 @@ function lumi_build_system_prompt(array $user): string
         '{{energy}}' => (string)$user['energy'],
         '{{valence}}' => (string)$user['mood_valence'],
         '{{persona}}' => (string)$user['companion_persona'],
+        '{{persona_name}}' => lumi_current_persona($user)['name'],
         '{{time}}' => date('H:i'),
         '{{date}}' => date('Y-m-d'),
     ];
-    return strtr($template, $replacements);
+    $prompt = strtr($template, $replacements);
+    $persona = lumi_current_persona($user);
+    if (mb_strpos($prompt, $persona['prompt']) === false) {
+        $prompt .= "\n\n【当前人格】" . $persona['name'] . "：" . $persona['prompt']
+            . "请始终保持这个角色的语气与边界，不要跳出角色，也不要复述人格设定。";
+    }
+    return $prompt;
 }
 
 function lumi_context_messages(int $userId, int $conversationId, int $limit = 18): array
@@ -795,14 +935,25 @@ function lumi_fallback_reply(array $user, string $text): array
             ['content' => "（把杯子往你那边推了推）先喝一口。你说的时候不用组织语言，想到哪里就说到哪里。", 'mood' => 'calm'],
         ],
     ];
-    $choices = $sets[$primary] ?? $sets['neutral'];
-    $choice = $choices[array_rand($choices)];
-    if ($mood === '生气' && $primary !== 'apology' && $primary !== 'intimacy') {
+    $persona = lumi_current_persona($user);
+    $personaSet = (array)($persona['fallback'] ?? []);
+    $custom = false;
+    if ($primary === 'greeting' && !empty($persona['greeting'])) {
+        $choice = ['content' => (string)$persona['greeting'], 'mood' => 'happy'];
+        $custom = true;
+    } elseif (!empty($personaSet[$primary])) {
+        $choice = $personaSet[$primary];
+        $custom = true;
+    } else {
+        $choices = $sets[$primary] ?? $sets['neutral'];
+        $choice = $choices[array_rand($choices)];
+    }
+    if (!$custom && $mood === '生气' && $primary !== 'apology' && $primary !== 'intimacy') {
         if (random_int(0, 2) === 0) {
             $choice = ['content' => "（还带着一点没消的气）我现在还没完全缓过来。你先说，我听着。", 'mood' => 'angry'];
         }
     }
-    if ($primary === 'neutral' && random_int(0, 4) === 0) {
+    if (!$custom && $primary === 'neutral' && random_int(0, 4) === 0) {
         $hour = (int)date('H');
         if ($hour >= 23 || $hour < 5) {
             $choice = ['content' => "（看了一眼时间）这么晚还没睡。是睡不着，还是不想让今天结束？我陪你。", 'mood' => 'tired'];
@@ -916,6 +1067,8 @@ function lumi_gesture_effect(string $type, array $user): array
         'flower' => ['affection' => 2, 'valence' => 8, 'anger' => -3, 'sadness' => -5, 'trust' => 1, 'label' => '送花', 'reply' => '（接过花，低头闻了闻，眼睛弯起来）今天是什么日子？我不管，收下了。你也要记得给自己留一朵。'],
         'hand' => ['affection' => 2, 'valence' => 5, 'anger' => -4, 'sadness' => -4, 'trust' => 2, 'label' => '牵手', 'reply' => '（手指先缩了一下，随后轻轻扣住你的）这样牵着，好像路就没那么难走了。'],
         'warm' => ['affection' => 1, 'valence' => 3, 'anger' => -2, 'sadness' => -2, 'energy' => 4, 'trust' => 1, 'label' => '披外套', 'reply' => '（把外套往你肩上拉了拉）冷就早说。别每次都等我看出来。'],
+        'kiss' => ['affection' => 4, 'valence' => 9, 'anger' => -8, 'sadness' => -7, 'energy' => 3, 'trust' => 3, 'label' => '亲亲', 'reply' => '（脸一下子红了，手忙脚乱地捂住脸）……你怎么突然这样。让我缓一下，不许看。'],
+        'tea' => ['affection' => 1, 'valence' => 4, 'anger' => -3, 'sadness' => -3, 'energy' => 5, 'trust' => 1, 'label' => '递热茶', 'reply' => '（双手接过杯子，暖意顺着指尖漫上来）谢谢。你也别光顾着我，自己那杯记得喝。'],
     ];
     $effect = $map[$type] ?? $map['hug'];
     $user['affection'] = lumi_clamp((int)$user['affection'] + (int)$effect['affection']);
