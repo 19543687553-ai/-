@@ -944,7 +944,12 @@
               <div class="section-grid">
                 ${switchRow('allowRegister', '开放注册', '关闭后新用户无法注册', s.allow_register === '1')}
                 ${switchRow('safetyEnabled', '安全过滤', '启用敏感词拦截与复核', s.safety_enabled === '1')}
-                ${switchRow('maintenanceMode', '维护模式', '前台显示维护提示，仅管理员可登录', s.maintenance_mode === '1')}
+                ${switchRow('maintenanceMode', '维护模式', '前台显示维护提示，暂停用户登录与聊天', s.maintenance_mode === '1')}
+                <label class="field span-2"><span class="field-label">维护公告文案</span>
+                  <textarea id="setMaintenanceNotice" style="min-height:70px" placeholder="维护时用户登录会看到这句话">${esc(s.maintenance_notice || '')}</textarea></label>
+                ${switchRow('modelPaused', '暂停模型回复（全局）', '所有用户暂时收到安静陪伴文案，不再请求模型', s.model_paused === '1')}
+                <label class="field span-2"><span class="field-label">暂停时的回复文案</span>
+                  <input class="input" id="setModelPauseNotice" value="${esc(s.model_pause_notice || '')}" placeholder="例如：她现在想安静地陪你一会儿"></label>
                 <div class="form-grid">
                   <label class="field"><span class="field-label">单条消息最大长度</span>
                     <input class="input" id="setMaxLen" type="number" min="100" max="5000" value="${esc(s.max_message_length)}"></label>
@@ -968,6 +973,9 @@
                 <input class="input" id="setProbability" type="number" min="0" max="1" step="0.05" value="${esc(s.proactive_probability)}"></label>
               <label class="field"><span class="field-label">上下文消息条数</span>
                 <input class="input" id="setContext" type="number" min="4" max="60" value="${esc(s.max_context_messages)}"></label>
+              <div class="span-2">${switchRow('journalEnabled', '启用每日日志', '到点后她会把你们的一天写成一篇日记', s.journal_enabled === '1')}</div>
+              <label class="field"><span class="field-label">日志生成时间（0-23 点）</span>
+                <input class="input" id="setJournalHour" type="number" min="0" max="23" value="${esc(s.journal_hour || '21')}"></label>
             </div>
             <div class="form-actions">
               <span class="form-note">保存后立即生效，无需重启服务</span>
@@ -999,6 +1007,11 @@
       allow_register: $('#allowRegister').getAttribute('aria-checked') === 'true' ? 1 : 0,
       safety_enabled: $('#safetyEnabled').getAttribute('aria-checked') === 'true' ? 1 : 0,
       maintenance_mode: $('#maintenanceMode').getAttribute('aria-checked') === 'true' ? 1 : 0,
+      maintenance_notice: $('#setMaintenanceNotice').value.trim(),
+      model_paused: $('#modelPaused').getAttribute('aria-checked') === 'true' ? 1 : 0,
+      model_pause_notice: $('#setModelPauseNotice').value.trim(),
+      journal_enabled: $('#journalEnabled').getAttribute('aria-checked') === 'true' ? 1 : 0,
+      journal_hour: $('#setJournalHour').value,
       proactive_enabled: $('#proactiveEnabled').getAttribute('aria-checked') === 'true' ? 1 : 0,
       proactive_idle_seconds: $('#setIdle').value,
       proactive_cooldown_seconds: $('#setCooldown').value,
@@ -1533,6 +1546,9 @@
         <div class="notice warn">${UI.icon('alert', 15)}<span>封禁后该用户登录会看到弹窗，弹窗内会原样展示封禁原因、封禁时间与解封时间。时间可精确到秒。</span></div>
         <div class="form-grid" style="margin-top:16px">
           <label class="field span-2"><span class="field-label">封禁原因</span>
+            <div class="preset-row" id="banReasons" style="margin-bottom:8px">
+              ${[['攻击性言论', '多次发送攻击性、侮辱性内容，违反社区约定'], ['骚扰他人', '持续骚扰其他用户，经提醒仍未停止'], ['违规内容', '发布违法违规或不当内容'], ['冒充身份', '冒充管理员或他人身份发布信息'], ['恶意刷屏', '短时间内大量重复发言，影响他人使用'], ['异常调用', '异常高频调用接口，疑似滥用服务']].map((p) => `<button type="button" class="mini-btn" data-reason="${esc(p[1])}">${esc(p[0])}</button>`).join('')}
+            </div>
             <textarea id="banReason" maxlength="500" style="min-height:92px" placeholder="例如：多次发送攻击性内容，违反社区约定">${esc('')}</textarea></label>
           <div class="span-2">
             <span class="field-label" style="margin-bottom:8px">快捷时长</span>
@@ -1600,6 +1616,17 @@
       updateBanPreview();
     });
     $('#banReason').addEventListener('input', updateBanPreview);
+    const reasonBox = $('#banReasons');
+    if (reasonBox) {
+      reasonBox.addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-reason]');
+        if (!btn) return;
+        $('#banReason').value = btn.dataset.reason;
+        $$('#banReasons .mini-btn').forEach((b) => b.classList.remove('accent'));
+        btn.classList.add('accent');
+        updateBanPreview();
+      });
+    }
   }
 
   function updateBanPreview() {
@@ -1659,13 +1686,15 @@
     const { user, state: moodState, ban, stats } = d.detail;
     $('#drawerAvatar').textContent = initial(user.nickname || user.username);
     $('#drawerName').textContent = user.nickname || user.username;
-    $('#drawerMeta').innerHTML = `@${esc(user.username)} · ID ${user.id} ${statusBadge(user.status)} <span class="badge">${esc(moodState.mood)}</span> <span class="badge">${esc(THEME_TEXT[user.theme] || user.theme)}</span>`;
+    const paused = !!(user.preferences && user.preferences.model_paused);
+    $('#drawerMeta').innerHTML = `@${esc(user.username)} · ID ${user.id} ${statusBadge(user.status)} <span class="badge">${esc(moodState.mood)}</span> <span class="badge">${esc(THEME_TEXT[user.theme] || user.theme)}</span>${paused ? ' <span class="badge warn">模型回复已暂停</span>' : ''}`;
     const tabs = [['overview', '概览'], ['messages', '对话'], ['mood', '情绪'], ['ban', '封禁'], ['feedback', '反馈'], ['profile', '资料']];
     $('#drawerTabs').innerHTML = tabs.map((t) => `<button class="drawer-tab ${d.tab === t[0] ? 'active' : ''}" data-drawer-tab="${t[0]}">${t[1]}</button>`).join('');
     $('#drawerFoot').innerHTML = `
       <button class="btn btn-ghost btn-sm" data-drawer-act="edit">${UI.icon('edit', 14)}编辑资料</button>
       <button class="btn btn-ghost btn-sm" data-drawer-act="care">${UI.icon('heart', 14)}人工关怀</button>
       <button class="btn btn-ghost btn-sm" data-drawer-act="reset">${UI.icon('key', 14)}重置密码</button>
+      <button class="btn btn-ghost btn-sm" data-drawer-act="pause">${UI.icon(paused ? 'bot' : 'clock', 14)}${paused ? '恢复模型回复' : '暂停模型回复'}</button>
       ${user.status === 'banned'
         ? `<button class="btn btn-primary btn-sm" data-drawer-act="unban">${UI.icon('check', 14)}解除封禁</button>`
         : `<button class="btn btn-danger btn-sm" data-drawer-act="ban">${UI.icon('ban', 14)}封禁用户</button>`}
@@ -1873,6 +1902,11 @@
               <option value="active" ${u.status === 'active' ? 'selected' : ''}>正常</option>
               <option value="banned" ${u.status === 'banned' ? 'selected' : ''}>封禁</option>
             </select></label>
+          <label class="field"><span class="field-label">模型回复</span>
+            <select id="euModelPaused">
+              <option value="0" ${!(u.preferences && u.preferences.model_paused) ? 'selected' : ''}>正常</option>
+              <option value="1" ${u.preferences && u.preferences.model_paused ? 'selected' : ''}>暂停（只发安静陪伴文案）</option>
+            </select></label>
           <label class="field span-2"><span class="field-label">陪伴者人设</span>
             <textarea id="euPersona" maxlength="200" style="min-height:70px">${esc(u.companion_persona)}</textarea></label>
           <label class="field span-2"><span class="field-label">运营备注</span>
@@ -1896,6 +1930,7 @@
                 energy: $('#euEnergy').value,
                 theme: $('#euTheme').value,
                 status: $('#euStatus').value,
+                model_paused: $('#euModelPaused').value,
                 companion_persona: $('#euPersona').value,
                 admin_note: $('#euNote').value
               });
@@ -1939,6 +1974,27 @@
       UI.toast('密码已重置', 'success');
     } catch (err) {
       UI.toast(err.message || '重置失败', 'error');
+    }
+  }
+
+  async function handleTogglePause(user) {
+    const paused = !!(user.preferences && user.preferences.model_paused);
+    const ok = await confirmDialog({
+      title: paused ? '恢复模型回复' : '暂停模型回复',
+      message: paused
+        ? '确认恢复该用户的模型回复？恢复后会重新请求模型生成回复。'
+        : '暂停后，该用户只会收到安静的陪伴文案，不再请求模型。聊天与主动消息都会安静下来。确认暂停？',
+      confirmText: paused ? '恢复回复' : '暂停回复',
+      danger: !paused
+    });
+    if (!ok) return;
+    try {
+      await api('adminUpdateUser', { user_id: user.id, model_paused: paused ? 0 : 1 });
+      UI.toast(paused ? '已恢复模型回复' : '已暂停该用户的模型回复', 'success');
+      if (state.drawer && state.drawer.userId === user.id) refreshDrawer();
+      loadView(state.view);
+    } catch (err) {
+      UI.toast(err.message || '操作失败', 'error');
     }
   }
 
@@ -2249,6 +2305,7 @@
     else if (act === 'edit') userEditModal(detail);
     else if (act === 'care') careModal(detail.user);
     else if (act === 'reset') handleResetPassword(detail.user.id);
+    else if (act === 'pause') handleTogglePause(detail.user);
     else if (act === 'ban') openBanModal(detail.user);
     else if (act === 'unban') handleUnban(detail.user.id);
     else if (act === 'delete') handleDeleteUser(detail.user);

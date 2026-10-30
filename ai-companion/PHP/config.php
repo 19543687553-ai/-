@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '1.5.0';
+const LUMI_VERSION = '1.6.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -239,6 +239,18 @@ function lumi_init_db(PDO $pdo): void
         created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS journals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        content TEXT NOT NULL,
+        mood TEXT DEFAULT '',
+        meta TEXT DEFAULT '{}',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE (user_id, day)
+    );
+
     CREATE TABLE IF NOT EXISTS feedbacks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -293,6 +305,7 @@ function lumi_init_db(PDO $pdo): void
     CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
     CREATE INDEX IF NOT EXISTS idx_mood_logs_user_created ON mood_logs(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_checkins_user_created ON checkins(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_journals_user_day ON journals(user_id, day);
     CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token_hash);
@@ -324,6 +337,11 @@ function lumi_default_settings(): array
         'max_context_messages' => '18',
         'safety_enabled' => '1',
         'maintenance_mode' => '0',
+        'maintenance_notice' => '心屿正在做一点小小的整理，很快就回来。',
+        'model_paused' => '0',
+        'model_pause_notice' => '她现在想安静地陪你一会儿，晚点再开口。',
+        'journal_enabled' => '1',
+        'journal_hour' => '21',
         'support_contact' => 'support@xinyu.app',
         'register_bonus_affection' => '10',
         'max_message_length' => '2000',
@@ -807,6 +825,8 @@ function lumi_public_user(array $user): array
             'tts' => false,
             'sound' => true,
             'reduce_motion' => false,
+            'notify' => false,
+            'model_paused' => false,
         ], $settings),
     ];
 }

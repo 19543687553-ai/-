@@ -288,14 +288,30 @@ function lumi_apply_assistant_mood(array $user, string $mood): array
     return $user;
 }
 
+function lumi_clean_mood_tags(string $content): string
+{
+    // 兼容模型无视格式约束的各种写法：大小写、换行、属性、重复标签、未闭合标签
+    $content = preg_replace('/<mood\b[^>]*>[\s\S]*?<\/mood\s*>/i', '', $content) ?? $content;
+    $content = preg_replace('/<mood\b[^>]*>[\s\S]*$/i', '', $content) ?? $content;
+    $content = preg_replace('/<\s*\/?\s*mood\s*>/i', '', $content) ?? $content;
+    $content = preg_replace("/\n{3,}/", "\n\n", $content) ?? $content;
+    return trim($content);
+}
+
 function lumi_extract_mood_tag(string &$content): string
 {
-    if (preg_match('/<mood>\s*(happy|calm|sad|angry|shy|tired|excited)\s*<\/mood>/i', $content, $m)) {
-        $content = trim(preg_replace('/<mood>.*?<\/mood>/i', '', $content, 1) ?? $content);
-        return strtolower($m[1]);
+    $mood = '';
+    if (preg_match('/<mood\b[^>]*>([\s\S]*?)<\/mood\s*>/i', $content, $m)) {
+        $raw = trim(strip_tags((string)$m[1]));
+        $raw = mb_strtolower($raw);
+        if (preg_match('/(happy|calm|sad|angry|shy|tired|excited)/i', $raw, $word)) {
+            $mood = strtolower($word[1]);
+        }
     }
-    return '';
+    $content = lumi_clean_mood_tags($content);
+    return $mood;
 }
+
 
 function lumi_model_config(): array
 {
@@ -930,6 +946,9 @@ function lumi_context_messages(int $userId, int $conversationId, int $limit = 18
 
 function lumi_generate_reply(array $user, array $context): array
 {
+    if (lumi_model_reply_paused($user)) {
+        return lumi_pause_reply() + ['tokens' => 0, 'latency' => 0, 'error' => 'paused'];
+    }
     $system = lumi_build_system_prompt($user);
     $messages = array_merge([['role' => 'system', 'content' => $system]], $context);
     $result = lumi_model_request($messages);
@@ -1083,6 +1102,10 @@ function lumi_proactive_fallback(array $user): array
 
 function lumi_proactive_message(array $user): array
 {
+    if (lumi_model_reply_paused($user)) {
+        $pause = lumi_pause_reply();
+        return ['content' => '（轻轻把灯调暗了一些，没有出声）我在。', 'mood' => $pause['mood'], 'degraded' => true];
+    }
     $context = lumi_context_messages((int)$user['id'], lumi_current_conversation_id((int)$user['id']), 8);
     $context[] = [
         'role' => 'user',
@@ -1098,6 +1121,192 @@ function lumi_proactive_message(array $user): array
     }
     $fallback = lumi_proactive_fallback($user);
     return ['content' => $fallback['content'], 'mood' => $fallback['mood'], 'degraded' => true];
+}
+
+function lumi_model_reply_paused(array $user): bool
+{
+    if ((int)lumi_setting('model_paused', '0') === 1) {
+        return true;
+    }
+    $settings = lumi_decode_json((string)($user['settings'] ?? '{}'));
+    return !empty($settings['model_paused']);
+}
+
+function lumi_pause_reply(): array
+{
+    $notice = trim((string)lumi_setting('model_pause_notice', ''));
+    if ($notice === '') {
+        $notice = '她现在想安静地陪你一会儿，晚点再开口。';
+    }
+    return ['content' => '（安静地坐在你旁边，没有急着说话）' . $notice, 'mood' => 'calm', 'degraded' => true];
+}
+
+function lumi_journal_day(?int $timestamp = null): string
+{
+    return date('Y-m-d', $timestamp ?? time());
+}
+
+function lumi_journal_stats(int $userId, string $day): array
+{
+    $pdo = lumi_db();
+    $start = strtotime($day . ' 00:00:00');
+    $end = $start + 86400;
+    $st = $pdo->prepare("SELECT
+        SUM(CASE WHEN role='user' THEN 1 ELSE 0 END) user_messages,
+        SUM(CASE WHEN role IN ('assistant','proactive') THEN 1 ELSE 0 END) her_messages
+        FROM messages WHERE user_id=? AND created_at>=? AND created_at<?");
+    $st->execute([$userId, $start, $end]);
+    $counts = $st->fetch() ?: [];
+
+    $st = $pdo->prepare("SELECT mood, note FROM checkins WHERE user_id=? AND created_at>=? AND created_at<? ORDER BY id DESC LIMIT 1");
+    $st->execute([$userId, $start, $end]);
+    $checkin = $st->fetch() ?: null;
+
+    $st = $pdo->prepare("SELECT type, COUNT(*) c FROM interactions WHERE user_id=? AND created_at>=? AND created_at<? GROUP BY type ORDER BY c DESC LIMIT 1");
+    $st->execute([$userId, $start, $end]);
+    $gesture = $st->fetch() ?: null;
+
+    $st = $pdo->prepare("SELECT role, content FROM messages WHERE user_id=? AND created_at>=? AND created_at<? AND role IN ('user','assistant','proactive') ORDER BY id DESC LIMIT 12");
+    $st->execute([$userId, $start, $end]);
+    $recent = array_reverse($st->fetchAll());
+
+    return [
+        'user_messages' => (int)($counts['user_messages'] ?? 0),
+        'her_messages' => (int)($counts['her_messages'] ?? 0),
+        'total_messages' => (int)($counts['user_messages'] ?? 0) + (int)($counts['her_messages'] ?? 0),
+        'checkin' => $checkin,
+        'gesture' => $gesture,
+        'recent' => $recent,
+    ];
+}
+
+function lumi_journal_fallback(array $user, array $stats): string
+{
+    $persona = lumi_current_persona($user);
+    $parts = [];
+    if ($stats['user_messages'] > 0) {
+        $parts[] = '今天你和我说了 ' . $stats['user_messages'] . ' 句话，我把它们都记下了。';
+    } else {
+        $parts[] = '今天你来得不多，这里安静得很轻，我没有催你。';
+    }
+    if (!empty($stats['checkin']['mood'])) {
+        $parts[] = '你签到的时候写的是「' . $stats['checkin']['mood'] . '」，我照着那个心情，把自己的声音也放慢了一点。';
+    }
+    if (!empty($stats['gesture']['type'])) {
+        $labels = ['hug' => '抱抱', 'headpat' => '摸摸头', 'flower' => '送花', 'hand' => '牵手', 'warm' => '披外套', 'kiss' => '亲亲', 'tea' => '递热茶', 'sing' => '唱歌', 'star' => '看星星'];
+        $parts[] = '你今天的' . ($labels[$stats['gesture']['type']] ?? '小动作') . '，到现在还留在我心上。';
+    }
+    if (!empty($stats['checkin']['note'])) {
+        $parts[] = '你留下的那句话是：' . lumi_clean_text((string)$stats['checkin']['note'], 60) . '。我把它放在今天这一页。';
+    }
+    $tail = trim((string)($persona['checkin_tail'] ?? ''));
+    $parts[] = $tail !== '' ? $tail : '明天如果你还来，我就在原来的地方等你。';
+    return implode('', $parts);
+}
+
+function lumi_journal_generate(array $user, string $day, ?array $stats = null): array
+{
+    $stats = $stats ?? lumi_journal_stats((int)$user['id'], $day);
+    $mood = lumi_mood_label($user);
+    $content = '';
+    $config = lumi_model_config();
+    if ($config['configured'] && !lumi_model_reply_paused($user) && $stats['total_messages'] + ($stats['checkin'] ? 1 : 0) > 0) {
+        $lines = [];
+        foreach ($stats['recent'] as $row) {
+            $who = $row['role'] === 'user' ? 'TA' : '我';
+            $lines[] = $who . '：' . lumi_clean_text((string)$row['content'], 200);
+        }
+        if (!empty($stats['checkin']['mood'])) {
+            $lines[] = 'TA 今天的心情签到：' . $stats['checkin']['mood'] . '（' . lumi_clean_text((string)($stats['checkin']['note'] ?? ''), 60) . '）';
+        }
+        $persona = lumi_current_persona($user);
+        $prompt = '【写日记任务】请以第一人称写一篇只给自己看的小日记，记录今天和' . ($user['nickname'] ?: $user['username']) . '相处的感受。'
+            . '80 到 160 字，温柔、具体、有一点自己的小情绪，不要提问，不要列清单，不要输出任何 <mood> 标签。'
+            . '参考今天发生的事：' . "\n" . implode("\n", $lines);
+        $result = lumi_model_request([
+            ['role' => 'system', 'content' => '你是' . ($user['companion_name'] ?: '小屿') . '，人格是「' . $persona['name'] . '」。你正在写自己的私密日记。' . $persona['prompt']],
+            ['role' => 'user', 'content' => $prompt],
+        ], ['max_tokens' => 260, 'temperature' => 0.85]);
+        if ($result['ok']) {
+            $content = lumi_clean_mood_tags((string)$result['content']);
+            $content = preg_replace('/^【.*?】\s*/u', '', $content) ?? $content;
+            $content = trim((string)$content);
+        }
+    }
+    if ($content === '') {
+        $content = lumi_journal_fallback($user, $stats);
+    }
+    $now = time();
+    $meta = json_encode([
+        'user_messages' => $stats['user_messages'],
+        'her_messages' => $stats['her_messages'],
+        'checkin' => $stats['checkin']['mood'] ?? '',
+        'gesture' => $stats['gesture']['type'] ?? '',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $st = lumi_db()->prepare("INSERT INTO journals (user_id, day, content, mood, meta, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, day) DO UPDATE SET content=excluded.content, mood=excluded.mood, meta=excluded.meta, updated_at=excluded.updated_at");
+    $st->execute([(int)$user['id'], $day, $content, $mood, $meta, $now, $now]);
+    $st = lumi_db()->prepare("SELECT * FROM journals WHERE user_id=? AND day=? LIMIT 1");
+    $st->execute([(int)$user['id'], $day]);
+    $row = $st->fetch() ?: ['id' => 0, 'day' => $day, 'content' => $content, 'mood' => $mood, 'meta' => $meta, 'created_at' => $now];
+    return lumi_journal_row($row);
+}
+
+function lumi_journal_row(array $row): array
+{
+    $meta = json_decode((string)($row['meta'] ?? '{}'), true);
+    return [
+        'id' => (int)($row['id'] ?? 0),
+        'day' => (string)($row['day'] ?? ''),
+        'content' => lumi_clean_mood_tags((string)($row['content'] ?? '')),
+        'mood' => (string)($row['mood'] ?? ''),
+        'meta' => is_array($meta) ? $meta : [],
+        'created_at' => (int)($row['created_at'] ?? 0),
+        'updated_at' => (int)($row['updated_at'] ?? 0),
+    ];
+}
+
+function lumi_journal_find(int $userId, string $day): ?array
+{
+    $st = lumi_db()->prepare("SELECT * FROM journals WHERE user_id=? AND day=? LIMIT 1");
+    $st->execute([$userId, $day]);
+    $row = $st->fetch();
+    return $row ? lumi_journal_row($row) : null;
+}
+
+function lumi_journal_ensure(array $user, bool $force = false): ?array
+{
+    if ((int)lumi_setting('journal_enabled', '1') !== 1) {
+        return null;
+    }
+    $day = lumi_journal_day();
+    $existing = lumi_journal_find((int)$user['id'], $day);
+    if ($existing && !$force) {
+        return $existing;
+    }
+    $stats = lumi_journal_stats((int)$user['id'], $day);
+    if (!$force && $stats['total_messages'] === 0 && !$stats['checkin']) {
+        return null;
+    }
+    return lumi_journal_generate($user, $day, $stats);
+}
+
+function lumi_journal_list(int $userId, int $limit = 30, int $beforeId = 0): array
+{
+    $limit = max(5, min(60, $limit));
+    $sql = "SELECT * FROM journals WHERE user_id=?";
+    $params = [$userId];
+    if ($beforeId > 0) {
+        $sql .= " AND id < ?";
+        $params[] = $beforeId;
+    }
+    $sql .= " ORDER BY day DESC LIMIT " . $limit;
+    $st = lumi_db()->prepare($sql);
+    $st->execute($params);
+    $items = [];
+    foreach ($st->fetchAll() as $row) {
+        $items[] = lumi_journal_row($row);
+    }
+    return $items;
 }
 
 function lumi_checkin_moods(): array
@@ -1154,6 +1363,9 @@ function lumi_save_message(int $userId, int $conversationId, string $role, strin
 {
     $pdo = lumi_db();
     $now = time();
+    if ($role !== 'user') {
+        $content = lumi_clean_mood_tags($content);
+    }
     $st = $pdo->prepare("INSERT INTO messages (user_id, conversation_id, role, content, emotion, mood_after, tokens, is_read, created_at, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $st->execute([$userId, $conversationId, $role, $content, $mood, $mood, $tokens, $isRead ? 1 : 0, $now, json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
     $id = (int)$pdo->lastInsertId();
@@ -1166,10 +1378,14 @@ function lumi_save_message(int $userId, int $conversationId, string $role, strin
 function lumi_message_row(array $row): array
 {
     $meta = json_decode((string)($row['meta'] ?? '{}'), true);
+    $content = (string)$row['content'];
+    if (($row['role'] ?? '') !== 'user') {
+        $content = lumi_clean_mood_tags($content);
+    }
     return [
         'id' => (int)$row['id'],
         'role' => $row['role'],
-        'content' => $row['content'],
+        'content' => $content,
         'emotion' => $row['emotion'],
         'mood_after' => $row['mood_after'],
         'tokens' => (int)$row['tokens'],

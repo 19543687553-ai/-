@@ -46,6 +46,9 @@
     checkin: null,
     checkinMoods: [],
     checkinPick: '',
+    journal: null,
+    journalToday: null,
+    thinkingTimer: null,
     searchTimer: null
   };
 
@@ -106,6 +109,7 @@
     state.personas = Array.isArray(data.personas) ? data.personas : [];
     state.checkinMoods = Array.isArray(data.checkin_moods) ? data.checkin_moods : [];
     state.checkin = data.checkin || null;
+    state.journalToday = data.journal_today || null;
     $('#companionName').textContent = state.user.companion_name || '小屿';
     document.title = '心屿 · ' + (state.user.companion_name || '小屿') + '在等你';
     buildPersonaFilters();
@@ -387,6 +391,12 @@
 
     $('#saveProfile').addEventListener('click', saveProfile);
     $('#savePreferences').addEventListener('click', savePreferences);
+    $('#journalWrite').addEventListener('click', writeJournalToday);
+    $('#prefNotify').addEventListener('click', () => {
+      const on = $('#prefNotify').getAttribute('aria-checked') !== 'true';
+      $('#prefNotify').setAttribute('aria-checked', String(on));
+      if (on) requestNotifyPermission(false);
+    });
     $('#changePassword').addEventListener('click', changePassword);
     $('#deleteAccount').addEventListener('click', deleteAccount);
     $('#submitFeedback').addEventListener('click', submitFeedback);
@@ -462,13 +472,14 @@
   }
 
   function switchView(name) {
-    if (!['chat', 'insights', 'memories', 'settings'].includes(name)) return;
+    if (!['chat', 'insights', 'memories', 'journal', 'settings'].includes(name)) return;
     state.view = name;
     $$('.view').forEach((v) => v.classList.toggle('active', v.id === 'view' + name.charAt(0).toUpperCase() + name.slice(1)));
     $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
     closeSide();
     if (name === 'chat') scrollBottom();
     if (name === 'insights' || name === 'memories') loadInsights();
+    if (name === 'journal') loadJournals();
   }
 
   function openSide() {
@@ -684,8 +695,7 @@
     $('#suggestionRow').innerHTML = '';
     state.sending = true;
     $('#sendBtn').disabled = true;
-    clearTimeout(state.typingTimer);
-    state.typingTimer = setTimeout(() => { $('#typingRow').hidden = false; scrollBottom(); }, 420);
+    showThinking();
 
     try {
       const result = await LumiAPI.stream('chat', {
@@ -694,8 +704,7 @@
         stream: 1
       }, (evt) => {
         if (evt.type === 'start') {
-          clearTimeout(state.typingTimer);
-          $('#typingRow').hidden = true;
+          hideThinking();
           state.conversationId = evt.conversation_id || state.conversationId;
           reply = {
             id: streamId,
@@ -718,6 +727,7 @@
       });
 
       clearTimeout(state.typingTimer);
+      clearInterval(state.thinkingTimer);
       $('#typingRow').hidden = true;
 
       if (result && result.fallback) {
@@ -747,8 +757,7 @@
       scrollBottom();
       if (prefs().sound !== false) UI.chime('sent');
     } catch (err) {
-      clearTimeout(state.typingTimer);
-      $('#typingRow').hidden = true;
+      hideThinking();
       state.messages = state.messages.filter((m) => m.id !== tempId && m.id !== streamId);
       renderMessages();
       if (err && err.code === 403 && err.data && err.data.ban) {
@@ -874,7 +883,7 @@
   }
 
   async function poll() {
-    if (document.hidden || state.sending) return;
+    if (state.sending) return;
     try {
       const data = await LumiAPI.request('poll', {}, { timeout: 25000 });
       if (data.state) setMood(data.state);
@@ -890,10 +899,20 @@
           renderMessages();
           if (near || data.proactive) scrollBottom(true);
           markRead(incoming.map((m) => m.id));
+          incoming.forEach((m) => notifyMessage(m, m.role === 'proactive'));
         }
         if (data.proactive) {
           UI.toast('她主动来找你了', 'success');
           if (prefs().sound !== false) UI.chime('received');
+        }
+      }
+      if (data.journal && (!state.journalToday || state.journalToday.id !== data.journal.id)) {
+        state.journalToday = data.journal;
+        if (state.view === 'journal') {
+          state.journal = null;
+          loadJournals(true);
+        } else {
+          UI.toast('她把今天的日记写好了', 'success');
         }
       }
     } catch (err) {
@@ -1121,6 +1140,151 @@
     box.querySelectorAll('[data-jump]').forEach((btn) => {
       btn.addEventListener('click', () => focusMessage(Number(btn.dataset.jump)));
     });
+  }
+
+  async function loadJournals(force) {
+    if (state.journal && !force) {
+      renderJournals(state.journal);
+      return;
+    }
+    try {
+      const data = await LumiAPI.request('journals', { limit: 30 });
+      state.journal = data;
+      if (data.today) state.journalToday = data.today;
+      renderJournals(data);
+    } catch (err) {
+      const box = $('#journalList');
+      if (box) box.innerHTML = '<div class="empty"><div class="empty-inner">' + UI.icon('edit', 26) +
+        '<strong>日记暂时没有翻出来</strong><span>' + UI.escapeHTML(err.message || '稍后再试') + '</span></div></div>';
+    }
+  }
+
+  function renderJournals(data) {
+    const box = $('#journalList');
+    if (!box) return;
+    const items = (data && data.items) || [];
+    const today = localDay();
+    if (!items.length) {
+      box.innerHTML = '<div class="empty"><div class="empty-inner">' + UI.icon('edit', 26) +
+        '<strong>她还没有写下第一篇</strong><span>今天聊过之后，点右上角「写今天的」，她会把这一天收进日记里。</span></div></div>';
+      return;
+    }
+    box.innerHTML = items.map((j) => {
+      const date = j.day ? new Date(j.day + 'T12:00:00') : new Date();
+      const dayText = (date.getMonth() + 1) + ' 月 ' + date.getDate() + ' 日';
+      const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+      const isToday = j.day === today;
+      const counts = j.meta || {};
+      return '<article class="journal-card' + (isToday ? ' today' : '') + '">' +
+        '<div class="journal-head">' +
+          '<div class="journal-date-wrap"><b>' + dayText + '</b><span>' + week + (isToday ? ' · 今天' : '') + '</span></div>' +
+          '<div class="journal-tags">' +
+            (j.mood ? '<span class="journal-tag">' + UI.icon('heart', 12) + UI.escapeHTML(j.mood) + '</span>' : '') +
+            (counts.user_messages ? '<span class="journal-tag">' + UI.icon('message', 12) + counts.user_messages + ' 句' + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<p class="journal-text">' + UI.escapeHTML(j.content) + '</p>' +
+        '<div class="journal-foot"><span>写于 ' + UI.formatDateTime(j.updated_at || j.created_at) + '</span></div>' +
+      '</article>';
+    }).join('');
+  }
+
+  function localDay(ts) {
+    const d = ts ? new Date(Number(ts) * 1000) : new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  async function writeJournalToday() {
+    const btn = $('#journalWrite');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const data = await LumiAPI.request('journalToday', {});
+      if (data.journal) {
+        state.journalToday = data.journal;
+        state.journal = null;
+        await loadJournals(true);
+        UI.toast('她把今天轻轻收进了日记', 'success');
+      }
+    } catch (err) {
+      UI.toast(err.message || '日记还没有写好', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  /* =========================================================
+     通知 / 思考中
+     ========================================================= */
+  function notificationSupported() {
+    return typeof window.Notification === 'function';
+  }
+
+  function requestNotifyPermission(silent) {
+    if (!notificationSupported()) {
+      if (!silent) UI.toast('这个浏览器暂时不支持通知', 'warn');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      if (!silent) UI.toast('通知已经打开了，她会在后台轻轻叫你', 'success');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      if (!silent) UI.toast('通知被浏览器拦截了，可以在站点设置里允许', 'warn');
+      return;
+    }
+    Notification.requestPermission().then((perm) => {
+      if (perm === 'granted') UI.toast('通知已经打开，她去后台也会提醒你', 'success');
+      else if (!silent) UI.toast('没有打开通知也没关系', 'warn');
+    });
+  }
+
+  function notifyMessage(message, proactive) {
+    if (!prefs().notify || !notificationSupported()) return;
+    if (Notification.permission !== 'granted') return;
+    if (!document.hidden && !proactive) return;
+    const name = (state.user && state.user.companion_name) || '小屿';
+    const body = String(message.content || '').replace(/<[^>]*>/g, '').slice(0, 90);
+    try {
+      const note = new Notification(proactive ? name + ' 主动来找你了' : name + ' 回了你一句', {
+        body: body,
+        tag: 'lumi-msg-' + message.id,
+        icon: AVATAR
+      });
+      note.onclick = () => {
+        window.focus();
+        note.close();
+      };
+    } catch (err) {
+      // 移动端部分浏览器不支持构造 Notification，静默跳过
+    }
+  }
+
+  const THINKING_LINES = ['她在读你的话…', '她把语气放轻了一点…', '她在想你刚才说的那句…', '她正在把心事组织成一句话…'];
+
+  function showThinking() {
+    clearTimeout(state.typingTimer);
+    state.typingTimer = setTimeout(() => {
+      $('#typingRow').hidden = false;
+      let index = 0;
+      const copy = $('#typingCopy');
+      if (copy) copy.textContent = THINKING_LINES[0];
+      clearInterval(state.thinkingTimer);
+      state.thinkingTimer = setInterval(() => {
+        index = (index + 1) % THINKING_LINES.length;
+        const node = $('#typingCopy');
+        if (node) node.textContent = THINKING_LINES[index];
+      }, 2400);
+      scrollBottom();
+    }, 380);
+  }
+
+  function hideThinking() {
+    clearTimeout(state.typingTimer);
+    clearInterval(state.thinkingTimer);
+    $('#typingRow').hidden = true;
   }
 
   async function focusMessage(id) {
@@ -1478,6 +1642,7 @@
     $('#prefProactive').setAttribute('aria-checked', String(prefs.proactive !== false));
     $('#prefSound').setAttribute('aria-checked', String(prefs.sound !== false));
     $('#prefTts').setAttribute('aria-checked', String(!!prefs.tts));
+    $('#prefNotify').setAttribute('aria-checked', String(!!prefs.notify));
     $('#prefMotion').setAttribute('aria-checked', String(!!prefs.reduce_motion));
     document.body.classList.toggle('reduce-motion', !!prefs.reduce_motion);
     $('#fontSizeValue').textContent = u.font_size || 15;
@@ -1540,7 +1705,8 @@
       proactive: $('#prefProactive').getAttribute('aria-checked') === 'true',
       sound: $('#prefSound').getAttribute('aria-checked') === 'true',
       reduce_motion: $('#prefMotion').getAttribute('aria-checked') === 'true',
-      tts: $('#prefTts').getAttribute('aria-checked') === 'true'
+      tts: $('#prefTts').getAttribute('aria-checked') === 'true',
+      notify: $('#prefNotify').getAttribute('aria-checked') === 'true'
     };
     try {
       const data = await LumiAPI.request('updateProfile', Object.assign(profilePayload(), { preferences: preferences }));

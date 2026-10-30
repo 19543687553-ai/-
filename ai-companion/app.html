@@ -20,6 +20,7 @@
         <button class="rail-btn active" data-view="chat" type="button" aria-label="陪伴聊天" title="陪伴聊天"><span data-icon="chat" data-size="20"></span><span class="rail-tip">陪伴</span></button>
         <button class="rail-btn" data-view="insights" type="button" aria-label="情绪轨迹" title="情绪轨迹"><span data-icon="pulse" data-size="20"></span><span class="rail-tip">轨迹</span></button>
         <button class="rail-btn" data-view="memories" type="button" aria-label="收藏的回忆" title="收藏的回忆"><span data-icon="bookmark" data-size="20"></span><span class="rail-tip">回忆</span></button>
+        <button class="rail-btn" data-view="journal" type="button" aria-label="她的日记" title="她的日记"><span data-icon="edit" data-size="20"></span><span class="rail-tip">日志</span></button>
         <button class="rail-btn" data-view="settings" type="button" aria-label="我的设置" title="我的设置"><span data-icon="settings" data-size="20"></span><span class="rail-tip">设置</span></button>
       </nav>
       <div class="rail-foot">
@@ -64,7 +65,7 @@
             <div id="messageList" class="message-list"></div>
             <div class="typing-row" id="typingRow" hidden>
               <span class="msg-avatar"><img src="assets/companion.jpg" alt=""></span>
-              <span class="typing-bubble"><i></i><i></i><i></i></span>
+              <span class="typing-bubble"><span class="typing-copy" id="typingCopy">她在读你的话…</span><i></i><i></i><i></i></span>
             </div>
             <div class="chat-end-space"></div>
           </div>
@@ -164,6 +165,21 @@
         </header>
         <div class="view-scroll">
           <div class="memory-grid" id="memoryGrid"></div>
+        </div>
+      </section>
+
+      <!-- 她的日记 -->
+      <section class="view" id="viewJournal">
+        <header class="page-head">
+          <div>
+            <span class="eyebrow">HER DIARY</span>
+            <h2>她写下的日记</h2>
+            <p>每天夜里，她会把你们的一天轻轻收进一页。</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="journalWrite" type="button"><span data-icon="edit" data-size="15"></span>写今天的</button>
+        </header>
+        <div class="view-scroll">
+          <div class="journal-list" id="journalList"></div>
         </div>
       </section>
 
@@ -287,6 +303,10 @@
             <div class="pref-row">
               <div class="pref-copy"><strong>语音朗读</strong><span>她的回应会轻轻读出来（使用系统语音，仅本机播放）</span></div>
               <button class="switch" id="prefTts" role="switch" aria-checked="false" type="button" aria-label="语音朗读"></button>
+            </div>
+            <div class="pref-row">
+              <div class="pref-copy"><strong>浏览器通知</strong><span>页面切到后台时，她主动说话也会提醒你</span></div>
+              <button class="switch" id="prefNotify" role="switch" aria-checked="false" type="button" aria-label="浏览器通知"></button>
             </div>
             <div class="pref-row">
               <div class="pref-copy"><strong>减少动效</strong><span>让页面更安静一些</span></div>

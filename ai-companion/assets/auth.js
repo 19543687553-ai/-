@@ -252,7 +252,8 @@
       node.className = 'server-state online';
       node.querySelector('span').textContent = '后端在线 · ' + (config.app_name || '心屿');
       if (config.maintenance_mode) {
-        showAlert('心屿正在短暂维护，部分功能可能无法使用。', 'warn');
+        const notice = String(config.maintenance_notice || '').trim();
+        showAlert(notice || '心屿正在短暂维护，部分功能可能无法使用。', 'warn');
       }
       if (config.allow_register === false) {
         const tab = $('#tabRegister');

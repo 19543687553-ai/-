@@ -30,6 +30,8 @@ try {
         case 'markRead':               lumi_action_mark_read(); break;
         case 'insights':               lumi_action_insights(); break;
         case 'weeklyReport':           lumi_action_weekly_report(); break;
+        case 'journals':               lumi_action_journals(); break;
+        case 'journalToday':           lumi_action_journal_today(); break;
         case 'checkin':                lumi_action_checkin(); break;
         case 'checkinToday':           lumi_action_checkin_today(); break;
         case 'searchMessages':         lumi_action_search_messages(); break;
@@ -122,6 +124,7 @@ function lumi_action_app_config(): void
         'default_theme' => lumi_setting('default_theme', 'dusk'),
         'support_contact' => lumi_setting('support_contact', ''),
         'maintenance_mode' => (bool)(int)lumi_setting('maintenance_mode', '0'),
+        'maintenance_notice' => lumi_setting('maintenance_notice', ''),
         'server_time' => time(),
     ]);
 }
@@ -247,6 +250,10 @@ function lumi_action_login(): void
     if ($username === '' || $password === '') {
         lumi_err('请输入用户名和密码');
     }
+    if ((int)lumi_setting('maintenance_mode', '0')) {
+        $notice = trim((string)lumi_setting('maintenance_notice', ''));
+        lumi_err($notice !== '' ? $notice : '心屿正在短暂维护，请稍后再来', 503);
+    }
     lumi_rate_limit('login:' . lumi_client_ip() . ':' . $username, 10, 300);
 
     $pdo = lumi_db();
@@ -319,6 +326,7 @@ function lumi_action_me(): void
         'personas' => lumi_persona_catalog(),
         'checkin' => lumi_checkin_summary((int)$user['id']),
         'checkin_moods' => lumi_checkin_catalog(),
+        'journal_today' => lumi_journal_find((int)$user['id'], lumi_journal_day()),
         'server_time' => time(),
     ]);
 }
@@ -522,10 +530,9 @@ function lumi_sse_send(array $payload): void
  */
 function lumi_stream_filter(string &$pending, bool $final = false): string
 {
-    $pending = preg_replace('/<mood>.*?<\/mood>/is', '', $pending) ?? $pending;
+    $pending = preg_replace('/<mood\b[^>]*>[\s\S]*?<\/mood\s*>/i', '', $pending) ?? $pending;
     if ($final) {
-        $pending = preg_replace('/<mood[^>]*>/i', '', $pending) ?? $pending;
-        $pending = preg_replace('/<\/mood>/i', '', $pending) ?? $pending;
+        $pending = lumi_clean_mood_tags($pending);
     }
     $cut = strlen($pending);
     if (!$final && ($lt = strrpos($pending, '<')) !== false) {
@@ -580,8 +587,15 @@ function lumi_stream_chat(array $user, int $conversationId, array $analysis, arr
         $latency = 0;
         $mood = '';
         $modelError = '';
+        $paused = lumi_model_reply_paused($user);
 
-        if ($config['configured']) {
+        if ($paused) {
+            $pause = lumi_pause_reply();
+            $mood = (string)$pause['mood'];
+            lumi_stream_text((string)$pause['content'], $emit);
+        }
+
+        if (!$paused && $config['configured']) {
             $messages = array_merge(
                 [['role' => 'system', 'content' => lumi_build_system_prompt($user)]],
                 $context
@@ -805,10 +819,16 @@ function lumi_action_poll(): void
         }
     }
 
+    $journal = null;
+    if ((int)lumi_setting('journal_enabled', '1') === 1 && (int)date('G') >= max(0, min(23, (int)lumi_setting('journal_hour', '21')))) {
+        $journal = lumi_journal_ensure($user);
+    }
+
     lumi_ok([
         'state' => lumi_public_state($user),
         'messages' => $unread,
         'proactive' => $proactiveSent,
+        'journal' => $journal,
         'announcement' => lumi_active_announcement(),
         'unread_count' => count($unread),
         'server_time' => $now,
@@ -1046,6 +1066,32 @@ function lumi_action_weekly_report(): void
         'companion_name' => (string)$user['companion_name'],
         'lines' => $lines,
     ]);
+}
+
+function lumi_action_journals(): void
+{
+    $user = lumi_require_user();
+    $beforeId = (int)lumi_param('before_id', 0);
+    $limit = max(5, min(60, (int)lumi_param('limit', 30)));
+    $items = lumi_journal_list((int)$user['id'], $limit, $beforeId);
+    $today = lumi_journal_find((int)$user['id'], lumi_journal_day());
+    lumi_ok([
+        'items' => $items,
+        'today' => $today,
+        'enabled' => (int)lumi_setting('journal_enabled', '1') === 1,
+        'journal_hour' => (int)lumi_setting('journal_hour', '21'),
+    ]);
+}
+
+function lumi_action_journal_today(): void
+{
+    $user = lumi_require_user();
+    if ((int)lumi_setting('journal_enabled', '1') !== 1) {
+        lumi_err('日志功能暂时关闭了', 403);
+    }
+    lumi_rate_limit('journal:' . (int)$user['id'], 4, 600);
+    $journal = lumi_journal_ensure($user, true);
+    lumi_ok(['journal' => $journal], '这篇日记写好了');
 }
 
 function lumi_checkin_summary(int $userId): array
@@ -1552,6 +1598,12 @@ function lumi_action_admin_update_user(): void
             $params[] = $status;
         }
     }
+    if (lumi_param('model_paused', null) !== null) {
+        $settings = lumi_decode_json((string)$user['settings']);
+        $settings['model_paused'] = (bool)(int)lumi_param('model_paused');
+        $fields[] = 'settings=?';
+        $params[] = json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
     if (!$fields) lumi_err('没有需要更新的内容');
 
     $fields[] = 'mood_label=?';
@@ -1854,7 +1906,9 @@ function lumi_action_admin_save_settings(): void
     $allowed = [
         'app_name', 'app_tagline', 'allow_register', 'default_theme', 'welcome_message',
         'proactive_enabled', 'proactive_idle_seconds', 'proactive_cooldown_seconds', 'proactive_probability',
-        'max_context_messages', 'safety_enabled', 'maintenance_mode', 'support_contact',
+        'max_context_messages', 'safety_enabled', 'maintenance_mode', 'maintenance_notice',
+        'model_paused', 'model_pause_notice', 'journal_enabled', 'journal_hour',
+        'support_contact',
         'register_bonus_affection', 'max_message_length', 'messages_per_minute',
     ];
     $changed = [];

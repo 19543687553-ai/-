@@ -1,7 +1,7 @@
 # 心屿 · AI 情感陪伴机器人 — 交接文档
 
 > 面向下一个接手本项目的 AI / 工程师。请先完整读完本文件，再动代码。
-> 最后更新：2026-10-30 · 版本：v1.5.0
+> 最后更新：2026-10-31 · 版本：v1.6.0
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前状态与交付物
 
-- 版本：`v1.5.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
-- 安装包：`/workspace/AI 情感陪伴-v1.5.0.zip`（**不含** `PHP/data/`）
+- 版本：`v1.6.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
+- 安装包：`/workspace/AI 情感陪伴-v1.6.0.zip`（**不含** `PHP/data/`）
 - 默认账号：
   - 管理员：`zrl / 201354`（首次建库时写入，可用环境变量覆盖）
   - 体验用户：`demo / demo123`（昵称「晚晚」，有 12 条种子对话与 14 天情绪记录）
@@ -30,7 +30,7 @@
   - 另一用户：`chen / demo123`
 - 模型：默认 DeepSeek 预设，但**未配置 Key**，因此默认走离线陪伴模板。真实对话需在后台「模型配置」填 Key。
 
-功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报** —— 均已实现并通过浏览器验证。
+功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板** —— 均已实现，后端冒烟与浏览器验证通过。
 
 ---
 
@@ -87,7 +87,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 
 模型 API Key 用 AES-256-GCM（`openssl_encrypt`，随机 IV + tag）加密入库；主密钥来自 `LUMI_SECRET` 或 `PHP/data/.app_secret`。后台只返回掩码（`lumi_mask_key`），任何接口都不回显明文。
 
-### 数据库表（16 张）
+### 数据库表（17 张）
 
 | 表 | 用途 |
 | --- | --- |
@@ -99,6 +99,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 | `mood_logs` | 情绪快照（valence/anger/sadness/energy/affection/label/source） |
 | `interactions` | 手势互动（hug/headpat/flower/hand/warm/kiss/tea/sing/star） |
 | `checkins` | 每日心情签到（mood/note/valence/created_at，同一天可多次） |
+| `journals` | 每日日志（user_id + day 唯一，content/mood/meta JSON/updated_at） |
 | `feedbacks` | 用户反馈与后台回复 |
 | `announcements` | 公告（级别、启用、过期时间） |
 | `sensitive_words` | 敏感词与处置动作 |
@@ -116,14 +117,17 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 
 ### 用户
 `register`、`login`、`logout`、`me`、`updateProfile`、`changePassword`、`deleteAccount`、
-`chat`、`gesture`、`poll`、`history`、`markRead`、`insights`、`checkin`、`checkinToday`、`searchMessages`、`exportChat`、`pinMessage`、`feedbackCreate`、`feedbackList`
+`chat`、`gesture`、`poll`、`history`、`markRead`、`insights`、`checkin`、`checkinToday`、`searchMessages`、`exportChat`、`pinMessage`、`feedbackCreate`、`feedbackList`、`journals`、`journalToday`
 
 ### 后台
 `adminLogin`、`adminLogout`、`adminMe`、`adminStats`、`adminUsers`、`adminUserDetail`、`adminUpdateUser`、`adminBanUser`、`adminUnbanUser`、`adminResetPassword`、`adminDeleteUser`、`adminConversations`、`adminMessages`、`adminDeleteMessage`、`adminPinMessage`、`adminSendMessage`、`adminMoodAnalytics`、`adminSettings`、`adminSaveSettings`、`adminModelSave`、`adminModelTest`、`adminModelList`、`adminAnnouncements`、`adminAnnouncementSave`、`adminAnnouncementDelete`、`adminWords`、`adminWordSave`、`adminWordDelete`、`adminFeedbacks`、`adminFeedbackReply`、`adminAdmins`、`adminAdminSave`、`adminAdminDelete`、`adminAuditLogs`、`adminBroadcast`、`adminBackup`、`adminExportUsers`、`adminSystemInfo`
 
 几个容易记错的返回结构：
 
-- `me` → `{user, state, announcement, unread_count, model_configured, app_name, personas, checkin, checkin_moods, server_time}`；`personas` 为 14 条人格预设（id/name/tagline/category/desc/prompt/accent/icon/greeting），`user.persona_id` 为当前人格。
+- `me` → `{user, state, announcement, unread_count, model_configured, app_name, personas, checkin, checkin_moods, journal_today, server_time}`；`personas` 为 14 条人格预设（id/name/tagline/category/desc/prompt/accent/icon/greeting），`user.persona_id` 为当前人格。
+- `journals` → `{items, today, enabled, journal_hour}`；`items` 按 day 倒序（最多 60），`today` 为当天日志或 null。
+- `journalToday` → 强制生成/更新当天日志，返回 `{journal}`；限流 4 次 / 10 分钟；日志关闭时 403。
+- `poll` → 21 点后会自动确保当天日志；响应中的 `journal` 变化时前端提示或刷新日志页。
 - `insights` → 含 `stats/days/distribution/interactions/milestones/pinned/achievements/checkin`；`achievements` 为 6 个徽章（`first_word/hundred/seven/heartlink/collector/first_touch`），每项 `{id,label,desc,icon,unlocked}`。
 - `weeklyReport` → 近 7 天情绪周报：`range/messages/mine/hers/active_days/checkin_count/top_checkin/gesture_count/gesture_label/valence/affection/mood_label/persona/lines`；`lines` 为服务端按数据生成的 4-6 句总结，引用当前人格名。
 - `checkin` 参数 `mood/note`，返回 `{message,state,checkin,reply}`，并把人格式化为一条带 `meta.checkin` 的消息写入会话。
@@ -179,6 +183,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 | `lumi_persona_id()` / `lumi_current_persona()` | 从 `users.settings` JSON 读取人格，非法值回退 `gentle` |
 | `lumi_reply_style()` | 读取 `settings.reply_style`（brief/balanced/deep），非法值回退 `balanced` |
 | `lumi_checkin_moods()` / `lumi_checkin_catalog()` / `lumi_checkin_reply()` | 签到心情数值表、前端选项、人格化签到回复 |
+| `lumi_clean_mood_tags()` / `lumi_extract_mood_tag()` | 宽松清洗 `<mood>`（大小写/属性/多行/未闭合），并解析情绪 |
 
 关系阶段由 `lumi_relationship()` 根据亲密度映射（陌生 → 熟悉 → 亲近 → 依恋……）。提示词模板在 `settings.model_system_prompt`，支持 `{{companion_name}}`、`{{nickname}}`、`{{affection}}`、`{{mood_label}}` 等变量。
 
@@ -202,6 +207,12 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 **回复节奏（v1.4.0）**：设置页 `#replyStyle`（简短/适中/深入）写入 `users.settings.reply_style`；`lumi_build_system_prompt()` 末尾追加「【回复节奏】…」，真正约束模型输出长度。离线模板不受影响。
 
 **每日签到（v1.4.0）**：`checkin` 表 + `checkin/checkinToday` 接口。5 种心情（开心/平静/低落/疲惫/期待）各自调整 valence/energy/affection/sadness/anger；每天限 8 次；回复由 `lumi_checkin_reply()` 生成并拼接人格的 `checkin_tail`，同时作为一条 `meta.checkin` 消息进入会话。`lumi_checkin_summary()` 汇总今日、最近 7 天、连续天数与总数。
+
+**每日日志（v1.6.0）**：`journals` 表（`UNIQUE(user_id, day)`，同一天只保留一篇，可覆盖更新）。`emotion.php` 提供 `lumi_journal_stats()`（当天用户/她的话数、签到、手势、最近 12 条消息）、`lumi_journal_fallback()`（离线模板）、`lumi_journal_generate()`（有模型且未暂停时生成，否则模板，UPSERT）、`lumi_journal_ensure()`、`lumi_journal_find()`、`lumi_journal_list()`。生成时机：`poll` 在 `journal_hour`（默认 21 点）之后自动确保；用户也可点「写今天的」调 `journalToday` 强制生成。日志的 `meta` 保存 `{user_messages, her_messages, checkin, gesture}`，前端日志页展示日期、情绪标签、话数与正文。
+
+**通知与思考中（v1.6.0）**：设置页新增「浏览器通知」开关（`users.preferences.notify`），打开时请求 `Notification` 权限；`poll` 即使页面 `document.hidden` 也继续运行，收到新的 `assistant` / `proactive` 消息会触发系统通知（主动消息总是通知）。`sendMessage()` 开始在打字气泡内轮换「她在读你的话…」等 4 句思考文案，SSE `start`/`done`/失败时停止。
+
+**暂停模型回复（v1.6.0）**：`settings.model_paused`（全局）与 `users.settings.model_paused`（单用户）任一开启，`lumi_model_reply_paused()` 为真；`lumi_generate_reply()`、`lumi_stream_chat()`、`lumi_proactive_message()` 都改走 `lumi_pause_reply()`（安静陪伴文案 + `calm`），不请求模型。后台可在用户抽屉切换，或在编辑弹窗选择「模型回复」。
 
 ---
 
@@ -250,7 +261,9 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 
 ### 主界面
 
-左侧导航（桌面竖栏 / 移动底栏）+ 聊天区 + 右侧情绪栏；视图 `chat/insights/memories/settings`。`setMood()` 用 `--mood-a/--mood-b` 驱动光晕。包装输入框、手势条（9 个动作，窄屏自动换行）、建议 chips。轮询 22s。封禁监听 `lumi:ban`。聊天头部除心情 chip 外还有人格徽标 `#personaChip`，由 `renderPersona()` 根据 `state.personas` 渲染；新增搜索按钮 `#btnSearch` 打开 `#searchModal`。
+左侧导航（桌面竖栏 / 移动底栏）+ 聊天区 + 右侧情绪栏；视图 `chat/insights/memories/journal/settings`。`setMood()` 用 `--mood-a/--mood-b` 驱动光晕。包装输入框、手势条（9 个动作，窄屏自动换行）、建议 chips。轮询 22s。封禁监听 `lumi:ban`。聊天头部除心情 chip 外还有人格徽标 `#personaChip`，由 `renderPersona()` 根据 `state.personas` 渲染；新增搜索按钮 `#btnSearch` 打开 `#searchModal`。
+
+**日志页（v1.6.0）**：导航新增「日志」，`#viewJournal` 内 `#journalList` 由 `loadJournals()` 拉 `journals` 渲染卡片（日期、星期、情绪标签、话数、正文），`#journalWrite` 调 `journalToday` 强制生成；`switchView('journal')` 触发加载，轮询收到新日志时若正停留在日志页会静默刷新。
 
 **设置页人格卡片（v1.4.0）**：`#personaGrid` 在 `me` 返回后由 `buildPersonaGrid()` 渲染 14 张卡；`#personaFilters` 由 `buildPersonaFilters()` 渲染分类筛选（全部/温柔/活泼/沉稳/理性/文艺），事件委托只绑定一次，切换时 `renderPersonaCards()` 按 `category` 重绘。点击卡片 `choosePersona()` 立即写服务端并同步 `#setPersona` 文本；`renderPersona()` 统一维护选中态、头部徽标与提示文案。修改 `state.user.persona_id` 后必须调用 `renderPersona()`。
 
@@ -269,6 +282,8 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 ### 后台
 
 hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各 `renderXxx`；通用 `openModal`、`confirmDialog`（支持输入）、`chartSVG`（自绘 SVG 折线，移动端 430 viewBox / 11px 字号）、`barList`、`pagerHTML`；用户详情抽屉 6 个 tab（概览/对话/情绪/封禁/反馈/资料），抽屉内点击用 `data-drawer-act` 单独委托（**抽屉不在 `#adminContent` 内**）。
+
+**后台维护与运营能力（v1.6.0）**：系统设置新增维护公告文案（登录拦截时原样展示）、全局暂停模型回复与暂停文案、每日日志开关与生成时间；用户抽屉新增「暂停/恢复模型回复」按钮与徽章，编辑弹窗新增「模型回复」下拉；封禁弹窗新增 6 个常用原因模板（点击填充 `#banReason`）。`handleTogglePause()` 走 `adminUpdateUser` 的 `model_paused`，写入 `users.settings` JSON。
 
 ---
 
@@ -305,12 +320,16 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 | 签到卡片不刷新 | 只读了 `insights` 未同步 `state.checkin` | `renderInsights()` 内 `state.checkin = data.checkin; renderCheckin()` |
 | 搜索点开旧消息后无反应 | 消息不在当前分页列表 | `focusMessage()` 循环 `loadMore()`（最多 8 页）后再定位 |
 | 回复节奏切换后不持久 | 只改前端分段按钮 | `#replyStyle` 点击写 `settings.reply_style`，`fillSettings()` 回填 `.active` |
+| 聊天气泡正文出现 `<mood>calm</mood>` | 旧解析只匹配严格小写无属性，多行/大写/未闭合标签未清理 | `lumi_clean_mood_tags()` 宽松清洗；保存消息、历史消息、SSE 收尾统一走它 |
+| 日志同一天生成两篇 | 无幂等约束 | `journals` 表 `UNIQUE(user_id, day)` + UPSERT |
+| 日志函数出现无效 PHP 行 | 手写查询时拼错 | 统一用 `prepare` 查询，改完必须 `php -l` |
+| 抽屉暂停按钮点击无反应 | `handleTogglePause` 未定义 / 图标 `pause` 不存在 | 补齐函数；图标改用已有的 `bot`/`clock` |
 
 ---
 
 ## 9. 验证方法（改完必做）
 
-1. 语法：`php -l PHP/api.php && php -l PHP/config.php && php -l PHP/emotion.php && node --check assets/admin.js && node --check assets/api.js && node --check assets/app.js`
+1. 语法：`php -l PHP/api.php && php -l PHP/config.php && php -l PHP/emotion.php && node --check assets/admin.js && node --check assets/api.js && node --check assets/app.js && node --check assets/auth.js`
 2. 接口冒烟：登录取 token，逐个请求 `adminStats/adminUsers/adminUserDetail/adminMoodAnalytics/adminSettings/adminModelList/adminSystemInfo`，确认 200 与字段完整。
 3. 封禁链路：`adminBanUser` 用 `until_at = now + 125`，确认 `remaining_seconds=125`、`until_text` 到秒；再用被封账号登录确认 403 + `ban`。
 4. 拉取模型：本地起一个 mock `/models`（返回含重复项），验证去重、排序、搜索、点击填入、空 Key 与错误 Key 提示。
@@ -338,6 +357,13 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
    - `weeklyReport` 返回 `range/messages/mine/hers/active_days/checkin_count/top_checkin/gesture_count/gesture_label/valence/affection/mood_label/persona/lines`，空数据也返回 200；
    - `updateProfile` 接受 `theme=ocean`，`lumi_theme_ids()` 共 7 项，后台默认主题下拉含「潮汐」；
    - 浏览器：设置页 14 张人格卡 + 7 个主题选项；轨迹页「本周回顾」弹窗可打开/关闭；控制台 0 报错。
+11. v1.6.0 新增回归：
+   - `journals` 返回 `{items,today,enabled,journal_hour}`；`journalToday` 返回 `{journal}` 并在同一天重复调用时更新同一篇（`id` 不变）；
+   - `me` 含 `journal_today`；21 点后 `poll` 会自动生成日志；
+   - `adminUpdateUser` 传 `model_paused=1` 后，同一用户 `chat` 返回安静陪伴文案且 `tokens=0`，恢复后正常；
+   - 打开维护模式后 `login` 返回 503，`msg` 等于后台填写的维护公告；`appConfig` 含 `maintenance_notice`；
+   - `lumi_extract_mood_tag()` 对 `<mood>calm</mood>`、`<MOOD data-x="1">sad</MOOD>`、未闭合 `<mood>calm` 均能清空标签且不残留正文；
+   - 浏览器：日志页可打开/生成、设置页通知开关可保存、发送消息时思考文案轮换、后台用户抽屉暂停/恢复与服务设置保存均生效，控制台 0 报错。
 
 ---
 
@@ -350,7 +376,7 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 ```
 
 - 不打包 `PHP/data/`（首次部署自动生成）。
-- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.5.0）。
+- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.6.0）。
 - 打包后记录 SHA-256，方便校验。
 
 ---
