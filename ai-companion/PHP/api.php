@@ -103,6 +103,10 @@ try {
         case 'adminWords':             lumi_action_admin_words(); break;
         case 'adminWordSave':          lumi_action_admin_word_save(); break;
         case 'adminWordDelete':        lumi_action_admin_word_delete(); break;
+        case 'adminWordBulkImport':    lumi_action_admin_word_bulk_import(); break;
+        case 'adminWordExport':        lumi_action_admin_word_export(); break;
+        case 'adminSafetyHits':        lumi_action_admin_safety_hits(); break;
+        case 'adminClearSafetyHits':   lumi_action_admin_clear_safety_hits(); break;
         case 'adminTestSafety':        lumi_action_admin_test_safety(); break;
         case 'adminSaveSafetyRemote':  lumi_action_admin_save_safety_remote(); break;
         case 'adminTestSafetyRemote':  lumi_action_admin_test_safety_remote(); break;
@@ -568,15 +572,49 @@ function lumi_safety_normalize(string $text): string
     return $text;
 }
 
+function lumi_safety_user_id(): int
+{
+    $token = lumi_bearer();
+    if ($token === '') return 0;
+    $st = lumi_db()->prepare("SELECT user_id FROM user_sessions WHERE token_hash=? AND expires_at>? LIMIT 1");
+    $st->execute([hash('sha256', $token), time()]);
+    return (int)($st->fetchColumn() ?: 0);
+}
+
+function lumi_record_safety_hit(array $result, string $scene, ?int $userId = null): void
+{
+    if (empty($result['flagged'])) return;
+    try {
+        if ($userId === null) {
+            $userId = lumi_safety_user_id();
+        }
+        $matched = (string)($result['matched'] ?? '');
+        $source = (!empty($result['remote']) || $matched === '远程接口') ? 'remote' : 'local';
+        lumi_db()->prepare("INSERT INTO safety_hits (user_id, scene, word, category, action, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            ->execute([
+                $userId,
+                mb_substr($scene, 0, 20),
+                mb_substr($matched, 0, 60),
+                mb_substr((string)($result['category'] ?? ''), 0, 30),
+                !empty($result['allowed']) ? 'review' : 'block',
+                $source,
+                time(),
+            ]);
+    } catch (Throwable $e) {
+    }
+}
+
 function lumi_assert_safe(string $text, string $what = '内容'): void
 {
     if ($text === '') return;
     $result = lumi_check_safety($text);
     if (!$result['allowed']) {
+        lumi_record_safety_hit($result, $what);
         lumi_err('这段' . $what . '里有不适合出现的内容，换个说法再试好吗', 422, [
             'flagged' => true,
         ]);
     }
+    lumi_record_safety_hit($result, $what);
 }
 
 function lumi_safety_remote_url_allowed(string $url): bool
@@ -1034,6 +1072,7 @@ function lumi_action_chat(): void
     lumi_rate_limit('chat:' . (int)$user['id'], (int)lumi_setting('messages_per_minute', '20'), 60);
 
     $safety = lumi_check_safety($text);
+    lumi_record_safety_hit($safety, '聊天', (int)$user['id']);
     if (!$safety['allowed']) {
         lumi_err('这句话里有一些不适合发送的内容，换个方式告诉我，好吗', 422, ['flagged' => true, 'matched' => $safety['matched']]);
     }
@@ -2665,6 +2704,150 @@ function lumi_action_admin_word_delete(): void
     lumi_db()->prepare("DELETE FROM sensitive_words WHERE id=?")->execute([$id]);
     lumi_audit($admin, 'word.delete', 'word', (string)$id, '删除敏感词规则');
     lumi_ok([], '已删除');
+}
+
+function lumi_action_admin_word_bulk_import(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin', 'moderator']);
+    $raw = (string)lumi_param('text', '');
+    if ($raw === '') lumi_err('请粘贴要导入的规则');
+    if (mb_strlen($raw) > 200000) lumi_err('一次最多导入 20 万字符');
+    $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+    $added = 0;
+    $skipped = 0;
+    $invalid = 0;
+    $now = time();
+    $st = lumi_db()->prepare("INSERT OR IGNORE INTO sensitive_words (word, action, category, source, created_at, updated_at) VALUES (?, ?, ?, 'manual', ?, ?)");
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') continue;
+        $parts = preg_split('/[,，\t|]+/', $line) ?: [];
+        $word = trim((string)($parts[0] ?? ''));
+        if ($word === '' || mb_strlen($word) > 60) {
+            $invalid++;
+            continue;
+        }
+        $action = strtolower(trim((string)($parts[1] ?? '')));
+        if (!in_array($action, ['block', 'review'], true)) $action = 'review';
+        $category = trim((string)($parts[2] ?? ''));
+        if ($category === '') $category = '批量导入';
+        $st->execute([$word, $action, mb_substr($category, 0, 30), $now, $now]);
+        if ($st->rowCount() > 0) {
+            $added++;
+        } else {
+            $skipped++;
+        }
+    }
+    if ($added === 0 && $skipped === 0 && $invalid === 0) {
+        lumi_err('没有解析到有效词条');
+    }
+    lumi_audit($admin, 'word.bulk_import', 'safety', 'bulk', '批量导入：新增 ' . $added . ' / 跳过 ' . $skipped . ' / 无效 ' . $invalid);
+    lumi_ok([
+        'added' => $added,
+        'skipped' => $skipped,
+        'invalid' => $invalid,
+    ], '批量导入完成：新增 ' . $added . ' 条');
+}
+
+function lumi_action_admin_word_export(): void
+{
+    lumi_require_admin();
+    $rows = lumi_db()->query("SELECT word, action, category, source, created_at FROM sensitive_words ORDER BY id ASC")->fetchAll();
+    foreach ($rows as &$row) {
+        if (empty($row['source'])) $row['source'] = 'manual';
+        $row['created_at'] = (int)($row['created_at'] ?? 0);
+    }
+    unset($row);
+    lumi_ok([
+        'filename' => 'safety-words-' . date('Ymd-His') . '.json',
+        'count' => count($rows),
+        'content' => json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+    ]);
+}
+
+function lumi_action_admin_safety_hits(): void
+{
+    lumi_require_admin();
+    $pdo = lumi_db();
+    $page = max(1, (int)lumi_param('page', 1));
+    $perPage = 20;
+    $offset = ($page - 1) * $perPage;
+    $scene = trim((string)lumi_param('scene', ''));
+    $source = (string)lumi_param('source', '');
+    $where = '1=1';
+    $params = [];
+    if ($scene !== '') {
+        $where .= ' AND scene=?';
+        $params[] = $scene;
+    }
+    if (in_array($source, ['local', 'remote'], true)) {
+        $where .= ' AND source=?';
+        $params[] = $source;
+    }
+    $st = $pdo->prepare("SELECT COUNT(*) FROM safety_hits WHERE " . $where);
+    $st->execute($params);
+    $total = (int)$st->fetchColumn();
+    $st = $pdo->prepare("SELECT * FROM safety_hits WHERE " . $where . " ORDER BY id DESC LIMIT " . $perPage . " OFFSET " . $offset);
+    $st->execute($params);
+    $items = $st->fetchAll();
+    foreach ($items as &$item) {
+        $item['id'] = (int)$item['id'];
+        $item['user_id'] = (int)$item['user_id'];
+        $item['created_at'] = (int)$item['created_at'];
+    }
+    unset($item);
+
+    $since = time() - 86400 * 7;
+    $todayStart = strtotime('today');
+    $summary = [
+        'today' => (int)$pdo->query("SELECT COUNT(*) FROM safety_hits WHERE created_at>=" . $todayStart)->fetchColumn(),
+        'week' => (int)$pdo->query("SELECT COUNT(*) FROM safety_hits WHERE created_at>=" . $since)->fetchColumn(),
+        'blocked' => (int)$pdo->query("SELECT COUNT(*) FROM safety_hits WHERE created_at>=" . $since . " AND action='block'")->fetchColumn(),
+        'remote' => (int)$pdo->query("SELECT COUNT(*) FROM safety_hits WHERE created_at>=" . $since . " AND source='remote'")->fetchColumn(),
+        'total' => (int)$pdo->query("SELECT COUNT(*) FROM safety_hits")->fetchColumn(),
+    ];
+    $top = $pdo->query("SELECT word, category, source, COUNT(*) AS hits FROM safety_hits WHERE created_at>=" . $since . " AND word<>'' GROUP BY word, category, source ORDER BY hits DESC LIMIT 8")->fetchAll();
+    foreach ($top as &$row) {
+        $row['hits'] = (int)$row['hits'];
+    }
+    unset($row);
+    $scenes = $pdo->query("SELECT scene, COUNT(*) AS hits FROM safety_hits WHERE created_at>=" . $since . " GROUP BY scene ORDER BY hits DESC LIMIT 10")->fetchAll();
+    foreach ($scenes as &$row) {
+        $row['hits'] = (int)$row['hits'];
+    }
+    unset($row);
+    $trend = [];
+    for ($i = 6; $i >= 0; $i--) {
+        $dayStart = strtotime('today') - $i * 86400;
+        $dayEnd = $dayStart + 86400;
+        $trend[] = [
+            'day' => date('m-d', $dayStart),
+            'hits' => (int)$pdo->query("SELECT COUNT(*) FROM safety_hits WHERE created_at>=" . $dayStart . " AND created_at<" . $dayEnd)->fetchColumn(),
+        ];
+    }
+    lumi_ok([
+        'items' => $items,
+        'total' => $total,
+        'page' => $page,
+        'per_page' => $perPage,
+        'pages' => max(1, (int)ceil($total / $perPage)),
+        'summary' => $summary,
+        'top' => $top,
+        'scenes' => $scenes,
+        'trend' => $trend,
+    ]);
+}
+
+function lumi_action_admin_clear_safety_hits(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin']);
+    $days = max(0, (int)lumi_param('days', 7));
+    $cutoff = $days > 0 ? time() - $days * 86400 : time();
+    $st = lumi_db()->prepare("DELETE FROM safety_hits WHERE created_at < ?");
+    $st->execute([$cutoff]);
+    $deleted = $st->rowCount();
+    lumi_audit($admin, 'safety.clear_hits', 'safety', 'hits', '清理 ' . ($days > 0 ? $days . ' 天前' : '全部') . '命中记录：' . $deleted . ' 条');
+    lumi_ok(['deleted' => $deleted], '已清理 ' . $deleted . ' 条命中记录');
 }
 
 function lumi_action_admin_feedbacks(): void

@@ -24,7 +24,7 @@
     'message.delete': '删除消息', 'message.pin': '精选消息', 'message.send': '发送人工消息',
     'settings.update': '更新系统设置', 'model.save': '更新模型配置',
     'announcement.create': '发布公告', 'announcement.update': '修改公告', 'announcement.delete': '删除公告',
-    'word.create': '新增敏感词', 'word.delete': '删除敏感词', 'word.import': '导入远程词库',
+    'word.create': '新增敏感词', 'word.delete': '删除敏感词', 'word.import': '导入远程词库', 'word.bulk_import': '批量导入词库', 'safety.clear_hits': '清理命中记录',
     'feedback.reply': '回复反馈', 'broadcast.send': '全站关怀',
     'system.backup': '下载备份', 'system.export_users': '导出用户'
   };
@@ -1188,10 +1188,13 @@
 
   // ---------------- 敏感词 ----------------
   async function renderWords(box) {
-    const data = await api('adminWords');
+    const [data, hitData] = await Promise.all([api('adminWords'), api('adminSafetyHits')]);
     const items = data.items || [];
     const remote = data.remote || {};
     const presets = data.presets || {};
+    const hitItems = (hitData && hitData.items) || [];
+    const summary = (hitData && hitData.summary) || {};
+    const topWords = (hitData && hitData.top) || [];
     box.innerHTML = `
       <div class="section-grid">
         <div class="panel">
@@ -1288,6 +1291,48 @@
             </div>
           </div>
         </div>
+      </div>
+      <div class="section-grid" style="margin-top:18px">
+        <div class="panel">
+          <div class="panel-head"><div><h2>批量导入 / 导出</h2><p>每行一条：词条,处理,分类</p></div><span class="badge info">手动来源</span></div>
+          <div class="panel-body">
+            <label class="field"><span class="field-label">规则文本</span>
+              <textarea class="input" id="wordBulkInput" rows="6" style="min-height:132px;resize:vertical" placeholder="每行一条，处理填 block（拦截）或 review（复核）"></textarea></label>
+            <p class="cell-sub" id="wordBulkResult" style="margin-top:10px">支持换行、逗号、中文逗号或制表符分隔；重复词条自动跳过，导入后归为手动规则。</p>
+            <div class="panel-actions" style="margin-top:14px">
+              <button class="btn btn-primary" type="button" id="wordBulkBtn">${UI.icon('plus', 15)}批量导入</button>
+              <button class="btn btn-ghost" type="button" id="wordExportBtn">${UI.icon('download', 15)}导出 JSON</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><h2>命中记录</h2><p>近 7 天安全词命中与场景分布</p></div><span class="badge warn">今日 ${Number(summary.today || 0)}</span></div>
+          <div class="panel-body">
+            <div class="panel-actions" style="margin-bottom:12px">
+              <span class="badge info">近 7 天 ${Number(summary.week || 0)}</span>
+              <span class="badge danger">拦截 ${Number(summary.blocked || 0)}</span>
+              <span class="badge">远程 ${Number(summary.remote || 0)}</span>
+              <span class="badge">累计 ${Number(summary.total || 0)}</span>
+            </div>
+            ${topWords.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${topWords.map((t) => `<span class="badge">${esc(t.word)} × ${Number(t.hits)}</span>`).join('')}</div>` : '<p class="cell-sub">近 7 天还没有命中记录。</p>'}
+            <div class="table-scroll" style="max-height:260px">
+              <table class="data-table">
+                <thead><tr><th>时间</th><th>场景</th><th>词条</th><th>来源</th><th>处理</th></tr></thead>
+                <tbody>
+                  ${hitItems.map((h) => `
+                    <tr>
+                      <td class="cell-sub">${UI.formatDateTime(h.created_at)}</td>
+                      <td>${esc(h.scene || '—')}</td>
+                      <td class="cell-main">${esc(h.word || '—')}</td>
+                      <td>${h.source === 'remote' ? '<span class="badge info">远程</span>' : '<span class="badge">本地</span>'}</td>
+                      <td>${h.action === 'block' ? '<span class="badge danger">拦截</span>' : '<span class="badge warn">复核</span>'}</td>
+                    </tr>`).join('') || '<tr><td colspan="5">' + emptyHTML('暂无命中记录', '用户触发规则后会记录在这里') + '</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+            <div class="panel-actions" style="margin-top:12px"><button class="btn btn-ghost" type="button" id="safetyHitsClear">${UI.icon('trash', 15)}清理 7 天前</button></div>
+          </div>
+        </div>
       </div>`;
     mountIcons(box);
     const remoteProvider = $('#safetyRemoteProvider');
@@ -1363,6 +1408,55 @@
       try {
         const data = await api('adminClearRemoteWords');
         UI.toast(`已清空 ${data.deleted} 条远程词`, 'success');
+        loadView('words');
+      } catch (err) {
+        UI.toast(err.message || '操作失败', 'error');
+      }
+    });
+    $('#wordBulkBtn').addEventListener('click', async () => {
+      const text = $('#wordBulkInput').value.trim();
+      if (!text) {
+        UI.toast('请先粘贴要导入的规则', 'warn');
+        return;
+      }
+      const boxEl = $('#wordBulkResult');
+      boxEl.textContent = '正在批量导入…';
+      try {
+        const data = await api('adminWordBulkImport', { text });
+        boxEl.innerHTML = `已新增 <b>${Number(data.added || 0)}</b> 条，跳过重复 ${Number(data.skipped || 0)} 条，无效 ${Number(data.invalid || 0)} 条`;
+        UI.toast(`批量导入完成：新增 ${Number(data.added || 0)} 条`, 'success');
+        setTimeout(() => loadView('words'), 900);
+      } catch (err) {
+        boxEl.innerHTML = '<span class="badge danger">导入失败</span> ' + esc(err.message || '');
+      }
+    });
+    $('#wordExportBtn').addEventListener('click', async () => {
+      try {
+        const data = await api('adminWordExport');
+        const blob = new Blob([data.content || '[]'], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = data.filename || 'safety-words.json';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        UI.toast(`已导出 ${Number(data.count || 0)} 条规则`, 'success');
+      } catch (err) {
+        UI.toast(err.message || '导出失败', 'error');
+      }
+    });
+    $('#safetyHitsClear').addEventListener('click', async () => {
+      const ok = await confirmDialog({
+        title: '清理命中记录',
+        message: '只会清理 7 天前的记录，最近 7 天的命中会保留。',
+        confirmText: '确认清理'
+      });
+      if (!ok) return;
+      try {
+        const data = await api('adminClearSafetyHits', { days: 7 });
+        UI.toast(`已清理 ${Number(data.deleted || 0)} 条命中记录`, 'success');
         loadView('words');
       } catch (err) {
         UI.toast(err.message || '操作失败', 'error');

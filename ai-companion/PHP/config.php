@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '2.2.0';
+const LUMI_VERSION = '2.3.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -284,6 +284,17 @@ function lumi_init_db(PDO $pdo): void
         created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS safety_hits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT 0,
+        scene TEXT DEFAULT '',
+        word TEXT DEFAULT '',
+        category TEXT DEFAULT '',
+        action TEXT DEFAULT 'review',
+        source TEXT DEFAULT 'local',
+        created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS audit_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         admin_id INTEGER,
@@ -310,6 +321,7 @@ function lumi_init_db(PDO $pdo): void
     CREATE INDEX IF NOT EXISTS idx_checkins_user_created ON checkins(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_journals_user_day ON journals(user_id, day);
     CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+    CREATE INDEX IF NOT EXISTS idx_safety_hits_created ON safety_hits(created_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
     CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token_hash);
     CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
