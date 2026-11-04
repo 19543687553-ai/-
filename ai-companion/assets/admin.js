@@ -396,9 +396,25 @@
 
     const moodItems = (data.mood_distribution || []).map((m) => ({ label: m.label || '未知', value: m.value }));
     const themeItems = (data.theme_distribution || []).map((t) => ({ label: THEME_TEXT[t.theme] || t.theme, value: t.value }));
+    const riskItems = (data.risk_categories || []).map((r) => ({ label: r.label, value: r.value }));
+    const adminName = (state.admin && (state.admin.display_name || state.admin.username)) || '主理人';
+    const hour = new Date().getHours();
+    const greeting = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
 
     box.innerHTML = `
       <div class="section-grid">
+        <div class="dash-hero">
+          <div class="hero-copy">
+            <p class="hero-eyebrow"><i></i> OPERATIONS LIVE · ${UI.formatDateTime(data.server_time || Math.floor(Date.now() / 1000))}</p>
+            <h2>${greeting}，${esc(adminName)}</h2>
+            <p>今天有 <b>${s.new_today}</b> 位新用户到来，产生了 <b>${s.message_today}</b> 条消息。${s.flagged_messages > 0 ? `还有 <b>${s.flagged_messages}</b> 条风险消息等待复核。` : '风险队列已经清空，保持这个节奏。'}</p>
+          </div>
+          <div class="hero-actions">
+            <button class="hero-action danger" data-view-jump="messages" data-flagged="1"><b>${s.flagged_messages}</b><span>待复核风险</span></button>
+            <button class="hero-action" data-view-jump="feedbacks"><b>${s.open_feedback}</b><span>待处理反馈</span></button>
+            <button class="hero-action" data-view-jump="users"><b>${s.banned}</b><span>封禁用户</span></button>
+          </div>
+        </div>
         <div class="stat-grid">
           ${statCard('users', '用户总数', s.total_users, '今日新增 ' + s.new_today + ' 位')}
           ${statCard('activity', '今日活跃', s.active_today, '消息今日 ' + s.message_today + ' 条', true)}
@@ -423,6 +439,40 @@
               <div class="form-section">
                 <div class="form-section-title">${UI.icon('sparkles', 14)} 主题偏好</div>
                 ${barList(themeItems, ' 人')}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <div><h2>安全态势</h2><p>复核队列里的风险分类与最新命中</p></div>
+              <div class="panel-actions"><button class="mini-btn" data-view-jump="words">规则库 ${UI.icon('chevronRight', 13)}</button></div>
+            </div>
+            <div class="panel-body">
+              ${riskItems.length ? barList(riskItems, ' 条') : `<div class="empty-inline">${UI.icon('shield', 16)}<span>暂无待复核风险，安全词规则会持续守护对话边界。</span></div>`}
+              <div class="form-section">
+                <div class="form-section-title">${UI.icon('alert', 14)} 最新风险消息</div>
+                ${(data.recent_flagged || []).map((r) => `
+                  <div class="risk-line">
+                    <div><b>${esc(r.nickname)}</b><span>${esc(r.content).slice(0, 46)}</span></div>
+                    <em>${esc(r.matched || r.category)} · ${UI.relativeTime(r.created_at)}</em>
+                  </div>`).join('') || '<div class="form-note">队列已清空</div>'}
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><div><h2>快捷入口</h2><p>常用运营动作，一步抵达</p></div></div>
+            <div class="panel-body">
+              <div class="quick-grid">
+                ${[
+                  ['users', 'users', '用户管理', '资料与封禁'],
+                  ['messages', 'chat', '消息检索', '搜索与复核'],
+                  ['words', 'shield', '安全词库', '规则与测试'],
+                  ['announcements', 'megaphone', '公告管理', '定时发布'],
+                  ['settings', 'settings', '系统设置', '维护与限制'],
+                  ['tools', 'database', '数据工具', '备份与导出']
+                ].map((q) => `<button class="quick-tile" data-view-jump="${q[0]}">${UI.icon(q[1], 18)}<b>${q[2]}</b><span>${q[3]}</span></button>`).join('')}
               </div>
             </div>
           </div>
@@ -1047,6 +1097,7 @@
   // ---------------- 公告 ----------------
   async function renderAnnouncements(box) {
     const data = await api('adminAnnouncements');
+    const nowSec = Math.floor(Date.now() / 1000);
     box.innerHTML = `
       <div class="section-grid">
         <div class="toolbar">
@@ -1057,20 +1108,21 @@
         <div class="panel">
           <div class="table-scroll">
             <table class="data-table">
-              <thead><tr><th>标题</th><th>级别</th><th>状态</th><th>过期时间</th><th>发布人</th><th>操作</th></tr></thead>
+              <thead><tr><th>标题</th><th>级别</th><th>状态</th><th>开始时间</th><th>结束时间</th><th>发布人</th><th>操作</th></tr></thead>
               <tbody>
                 ${(data.items || []).map((a) => `
                   <tr>
                     <td><div class="cell-main">${esc(a.title)}</div><div class="cell-sub cell-ellipsis">${esc(a.content)}</div></td>
                     <td><span class="badge ${a.level === 'important' ? 'danger' : a.level === 'warm' ? 'info' : ''}">${esc(LEVEL_TEXT[a.level] || a.level)}</span></td>
-                    <td><span class="badge ${a.active ? 'ok' : ''}"><i></i>${a.active ? '展示中' : '已下线'}</span></td>
+                    <td>${!a.active ? '<span class="badge">已下线</span>' : a.starts_at > nowSec ? '<span class="badge info"><i></i>定时中</span>' : '<span class="badge ok"><i></i>展示中</span>'}</td>
+                    <td class="cell-sub">${a.starts_at ? UI.formatDateTime(a.starts_at) : '立即'}</td>
                     <td class="cell-sub">${a.expires_at ? UI.formatDateTime(a.expires_at) : '永久有效'}</td>
                     <td class="cell-sub">${esc(a.created_by || '—')}<br>${UI.formatDateTime(a.created_at)}</td>
                     <td><div class="cell-actions">
                       <button class="mini-btn" data-act="ann-edit" data-id="${a.id}">${UI.icon('edit', 13)}编辑</button>
                       <button class="mini-btn danger" data-act="ann-del" data-id="${a.id}">${UI.icon('trash', 13)}删除</button>
                     </div></td>
-                  </tr>`).join('') || '<tr><td colspan="6">' + emptyHTML('还没有公告', '新建一条，让用户知道发生了什么') + '</td></tr>'}
+                  </tr>`).join('') || '<tr><td colspan="7">' + emptyHTML('还没有公告', '新建一条，让用户知道发生了什么') + '</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -1081,10 +1133,10 @@
   }
 
   function announcementModal(item) {
-    const a = item || { title: '', content: '', level: 'info', active: 1, expires_at: 0 };
+    const a = item || { title: '', content: '', level: 'info', active: 1, starts_at: 0, expires_at: 0 };
     openModal({
       title: item ? '编辑公告' : '新建公告',
-      sub: '公告会展示在前台侧栏',
+      sub: '支持定时发布与自动下线，公告会展示在前台侧栏',
       width: 560,
       html: `
         <div class="form-grid">
@@ -1096,7 +1148,9 @@
             <select id="annLevel">
               ${['info', 'warm', 'important'].map((l) => `<option value="${l}" ${a.level === l ? 'selected' : ''}>${LEVEL_TEXT[l]}</option>`).join('')}
             </select></label>
-          <label class="field"><span class="field-label">过期时间（留空为永久）</span>
+          <label class="field"><span class="field-label">开始展示（留空为立即）</span>
+            <input class="input" type="datetime-local" step="1" id="annStarts" value="${a.starts_at ? toLocalInput(a.starts_at) : ''}"></label>
+          <label class="field"><span class="field-label">结束时间（留空为永久）</span>
             <input class="input" type="datetime-local" step="1" id="annExpires" value="${a.expires_at ? toLocalInput(a.expires_at) : ''}"></label>
           <div class="span-2 inline-switch"><div><p>立即展示</p><small>关闭后保存为草稿</small></div>
             <button type="button" class="switch" id="annActive" aria-checked="${a.active ? 'true' : 'false'}"></button></div>
@@ -1109,11 +1163,13 @@
             const content = $('#annContent').value.trim();
             if (!title || !content) { UI.toast('标题和内容都不能为空'); return; }
             const expires = $('#annExpires').value ? Math.floor(new Date($('#annExpires').value).getTime() / 1000) : 0;
+            const starts = $('#annStarts').value ? Math.floor(new Date($('#annStarts').value).getTime() / 1000) : 0;
             setBusy(ctx.button, true, '保存中');
             try {
               await api('adminAnnouncementSave', {
                 id: a.id || 0, title: title, content: content, level: $('#annLevel').value,
                 active: $('#annActive').getAttribute('aria-checked') === 'true' ? 1 : 0,
+                starts_at: starts,
                 expires_at: expires
               });
               UI.toast('公告已保存', 'success');
@@ -2130,7 +2186,11 @@
     const actionEl = event.target.closest('[data-act]');
     if (!actionEl) {
       const jump = event.target.closest('[data-view-jump]');
-      if (jump) switchView(jump.dataset.viewJump);
+      if (jump) {
+        if (jump.dataset.flagged === '1') state.filters.messages.flagged = '1';
+        if (jump.dataset.viewJump === 'messages') state.filters.messages.page = 1;
+        switchView(jump.dataset.viewJump);
+      }
       return;
     }
     const act = actionEl.dataset.act;
@@ -2378,6 +2438,50 @@
   }
 
   // ---------------- 初始化 ----------------
+  let cmdkIndex = 0;
+  let cmdkItems = [];
+
+  function cmdkCommands() {
+    return Object.entries(PAGE_META)
+      .map(([key, meta]) => ({ key: key, label: meta[0], desc: meta[1] }))
+      .filter((item) => item.key !== 'admins' || (state.admin && state.admin.role === 'superadmin'));
+  }
+
+  function renderCmdk(query) {
+    const q = String(query || '').trim().toLowerCase();
+    cmdkItems = cmdkCommands()
+      .map((item, index) => ({ ...item, index: index, rank: item.label.toLowerCase().includes(q) ? 0 : 1 }))
+      .filter((item) => !q || item.rank === 0 || item.desc.toLowerCase().includes(q) || item.key.includes(q))
+      .sort((a, b) => a.rank - b.rank || a.index - b.index);
+    if (cmdkIndex >= cmdkItems.length) cmdkIndex = Math.max(0, cmdkItems.length - 1);
+    $('#cmdkList').innerHTML = cmdkItems.map((item, index) => `
+      <button class="cmdk-item${index === cmdkIndex ? ' active' : ''}" data-cmdk="${item.key}">
+        <span><b>${esc(item.label)}</b><small>${esc(item.desc)}</small></span><em>打开</em>
+      </button>`).join('') || '<div class="cmdk-empty">没有匹配的页面</div>';
+  }
+
+  function openCmdk() {
+    if ($('#adminShell').hidden) return;
+    $('#cmdk').hidden = false;
+    document.body.classList.add('cmdk-open');
+    $('#cmdkInput').value = '';
+    cmdkIndex = 0;
+    renderCmdk('');
+    setTimeout(() => $('#cmdkInput').focus(), 40);
+  }
+
+  function closeCmdk() {
+    $('#cmdk').hidden = true;
+    document.body.classList.remove('cmdk-open');
+  }
+
+  function runCmdk() {
+    const item = cmdkItems[cmdkIndex];
+    if (!item) return;
+    closeCmdk();
+    switchView(item.key);
+  }
+
   function bindUI() {
     mountIcons();
     $('#adminLoginForm').addEventListener('submit', doAdminLogin);
@@ -2435,8 +2539,40 @@
       if (event.target === $('#adminModal')) closeModal();
     });
 
+    $('#btnCommand').addEventListener('click', openCmdk);
+    $('#cmdkClose').addEventListener('click', closeCmdk);
+    $('#cmdk').addEventListener('click', (event) => {
+      if (event.target === $('#cmdk')) { closeCmdk(); return; }
+      const item = event.target.closest('[data-cmdk]');
+      if (item) {
+        closeCmdk();
+        switchView(item.dataset.cmdk);
+      }
+    });
+    $('#cmdkInput').addEventListener('input', (event) => {
+      cmdkIndex = 0;
+      renderCmdk(event.target.value);
+    });
+    $('#cmdkInput').addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (!cmdkItems.length) return;
+        cmdkIndex = (cmdkIndex + (event.key === 'ArrowDown' ? 1 : -1) + cmdkItems.length) % cmdkItems.length;
+        renderCmdk($('#cmdkInput').value);
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        runCmdk();
+      }
+    });
+
     document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        if ($('#cmdk').hidden) openCmdk(); else closeCmdk();
+        return;
+      }
       if (event.key !== 'Escape') return;
+      if (!$('#cmdk').hidden) { closeCmdk(); return; }
       const modal = $('#adminModal');
       if (modal.classList.contains('open')) { closeModal(); return; }
       if ($('#adminDrawer').classList.contains('open')) closeDrawer();

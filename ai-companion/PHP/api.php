@@ -165,7 +165,7 @@ function lumi_action_app_config(): void
 
 function lumi_action_announcement_public(): void
 {
-    $row = lumi_db()->query("SELECT id, title, content, level, created_at FROM announcements WHERE active=1 AND (expires_at=0 OR expires_at> " . time() . ") ORDER BY id DESC LIMIT 1")->fetch();
+    $row = lumi_db()->query("SELECT id, title, content, level, starts_at, created_at FROM announcements WHERE active=1 AND (starts_at=0 OR starts_at<= " . time() . ") AND (expires_at=0 OR expires_at> " . time() . ") ORDER BY id DESC LIMIT 1")->fetch();
     lumi_ok(['announcement' => $row ?: null]);
 }
 
@@ -187,8 +187,8 @@ function lumi_create_user_session(int $userId): string
 function lumi_active_announcement(): ?array
 {
     $now = time();
-    $st = lumi_db()->prepare("SELECT id, title, content, level, created_at FROM announcements WHERE active=1 AND (expires_at=0 OR expires_at>?) ORDER BY id DESC LIMIT 1");
-    $st->execute([$now]);
+    $st = lumi_db()->prepare("SELECT id, title, content, level, starts_at, created_at FROM announcements WHERE active=1 AND (starts_at=0 OR starts_at<=?) AND (expires_at=0 OR expires_at>?) ORDER BY id DESC LIMIT 1");
+    $st->execute([$now, $now]);
     $row = $st->fetch();
     return $row ?: null;
 }
@@ -1436,8 +1436,31 @@ function lumi_action_admin_stats(): void
     $messageToday = (int)$pdo->query("SELECT COUNT(*) FROM messages WHERE created_at>=$today")->fetchColumn();
     $avgAffection = (float)$pdo->query("SELECT COALESCE(AVG(affection),0) FROM users WHERE status!='deleted'")->fetchColumn();
     $openFeedback = (int)$pdo->query("SELECT COUNT(*) FROM feedbacks WHERE status='open'")->fetchColumn();
-    $activeAnnouncements = (int)$pdo->query("SELECT COUNT(*) FROM announcements WHERE active=1 AND (expires_at=0 OR expires_at> $now)")->fetchColumn();
+    $activeAnnouncements = (int)$pdo->query("SELECT COUNT(*) FROM announcements WHERE active=1 AND (starts_at=0 OR starts_at<= $now) AND (expires_at=0 OR expires_at> $now)")->fetchColumn();
     $flaggedMessages = (int)$pdo->query("SELECT COUNT(*) FROM messages WHERE role='user' AND (meta LIKE '%\"flagged\":true%' OR meta LIKE '%\"flagged\": true%')")->fetchColumn();
+    $riskCategories = [];
+    $recentFlagged = [];
+    $riskSt = $pdo->query("SELECT m.id, m.content, m.meta, m.created_at, u.nickname, u.username FROM messages m JOIN users u ON u.id=m.user_id WHERE m.role='user' AND (m.meta LIKE '%\"flagged\":true%' OR m.meta LIKE '%\"flagged\": true%') ORDER BY m.id DESC LIMIT 200");
+    foreach ($riskSt->fetchAll() as $row) {
+        $meta = json_decode((string)$row['meta'], true);
+        $category = is_array($meta) && !empty($meta['category']) ? (string)$meta['category'] : '未分类';
+        $riskCategories[$category] = ($riskCategories[$category] ?? 0) + 1;
+        if (count($recentFlagged) < 5) {
+            $recentFlagged[] = [
+                'id' => (int)$row['id'],
+                'content' => (string)$row['content'],
+                'matched' => is_array($meta) ? (string)($meta['matched'] ?? '') : '',
+                'category' => $category,
+                'nickname' => $row['nickname'] ?: $row['username'],
+                'created_at' => (int)$row['created_at'],
+            ];
+        }
+    }
+    arsort($riskCategories);
+    $riskCategoryList = [];
+    foreach ($riskCategories as $label => $count) {
+        $riskCategoryList[] = ['label' => $label, 'value' => $count];
+    }
 
     $days = [];
     for ($i = 13; $i >= 0; $i--) {
@@ -1490,6 +1513,8 @@ function lumi_action_admin_stats(): void
         'series' => array_values($days),
         'mood_distribution' => $moodDistribution,
         'theme_distribution' => $themeDistribution,
+        'risk_categories' => $riskCategoryList,
+        'recent_flagged' => $recentFlagged,
         'recent_users' => $recentUsers,
         'recent_audit' => $audit,
         'recent_feedbacks' => $feedbacks,
@@ -2145,17 +2170,19 @@ function lumi_action_admin_announcement_save(): void
     $content = lumi_clean_text((string)lumi_param('content', ''), 1000);
     $level = (string)lumi_param('level', 'info');
     $active = (int)lumi_param('active', 1) ? 1 : 0;
+    $startsAt = (int)lumi_param('starts_at', 0);
     $expiresAt = (int)lumi_param('expires_at', 0);
     if ($title === '' || $content === '') lumi_err('公告标题和内容不能为空');
     if (!in_array($level, ['info', 'warm', 'important'], true)) $level = 'info';
+    if ($startsAt > 0 && $expiresAt > 0 && $startsAt >= $expiresAt) lumi_err('开始时间需要早于结束时间');
     if ($expiresAt > 0 && $expiresAt <= time()) lumi_err('过期时间需要晚于现在');
     if ($id > 0) {
-        lumi_db()->prepare("UPDATE announcements SET title=?, content=?, level=?, active=?, expires_at=? WHERE id=?")
-            ->execute([$title, $content, $level, $active, $expiresAt, $id]);
+        lumi_db()->prepare("UPDATE announcements SET title=?, content=?, level=?, active=?, starts_at=?, expires_at=? WHERE id=?")
+            ->execute([$title, $content, $level, $active, $startsAt, $expiresAt, $id]);
         lumi_audit($admin, 'announcement.update', 'announcement', (string)$id, $title);
     } else {
-        lumi_db()->prepare("INSERT INTO announcements (title, content, level, active, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            ->execute([$title, $content, $level, $active, $expiresAt, $admin['display_name'], time()]);
+        lumi_db()->prepare("INSERT INTO announcements (title, content, level, active, starts_at, expires_at, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+            ->execute([$title, $content, $level, $active, $startsAt, $expiresAt, $admin['display_name'], time()]);
         $id = (int)lumi_db()->lastInsertId();
         lumi_audit($admin, 'announcement.create', 'announcement', (string)$id, $title);
     }

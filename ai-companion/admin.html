@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#100d16">
 <title>心屿 · 控制台</title>
 <link rel="stylesheet" href="assets/base.css">
-<link rel="stylesheet" href="assets/admin.css">
+<link rel="stylesheet" href="assets/admin.css?v=2.0.0">
 </head>
 <body class="admin-body">
 
@@ -22,16 +22,16 @@
       </span>
     </div>
     <div class="art-copy">
-      <p class="eyebrow">EMOTIONAL COMPANION · OPERATIONS</p>
+      <p class="eyebrow">V2 CONTROL ROOM · SAFE OPERATIONS</p>
       <h1>看懂每一次<br><em>情绪起伏</em>。</h1>
-      <p>用户、对话、情绪曲线、模型与安全策略，都在同一间控制室里。你掌握节奏，她负责温柔。</p>
+      <p>用户、对话、情绪曲线、模型与安全策略，都在同一间控制室里。风险复核、定时公告、操作留痕，让每一次陪伴都被稳稳托住。</p>
     </div>
     <div class="art-metrics">
       <div><span>实时</span><b>情绪曲线</b></div>
       <div><span>秒级</span><b>封禁控制</b></div>
       <div><span>加密</span><b>模型 Key</b></div>
     </div>
-    <div class="art-foot">心屿 · 情感陪伴机器人管理后台 v1.9</div>
+    <div class="art-foot">心屿 · 情感陪伴机器人管理后台 v2.0</div>
   </div>
 
   <div class="login-panel">
@@ -126,6 +126,7 @@
         <p id="pageSub">今天的陪伴正在发生</p>
       </div>
       <div class="top-actions">
+        <button class="top-btn top-search" id="btnCommand" aria-label="快速搜索"><span data-icon="search"></span><span class="top-btn-text">快速搜索</span><span class="top-kbd">Ctrl K</span></button>
         <span class="top-chip" id="modelChip"><i class="status-dot"></i><span>模型状态</span></span>
         <button class="top-btn" id="btnRefresh" aria-label="刷新数据"><span data-icon="refresh"></span><span class="top-btn-text">刷新</span></button>
         <a class="top-btn" href="index.html" target="_blank" rel="noopener"><span data-icon="external"></span><span class="top-btn-text">前台</span></a>
@@ -184,8 +185,21 @@
   <footer class="drawer-foot" id="drawerFoot"></footer>
 </aside>
 
+<!-- 快速搜索 / 命令面板 -->
+<div class="cmdk" id="cmdk" hidden>
+  <div class="cmdk-panel" role="dialog" aria-modal="true" aria-label="快速搜索">
+    <div class="cmdk-head">
+      <span data-icon="search"></span>
+      <input id="cmdkInput" type="search" placeholder="搜索页面或动作，回车打开…" autocomplete="off">
+      <button class="cmdk-close" id="cmdkClose" aria-label="关闭"><span data-icon="x"></span></button>
+    </div>
+    <div class="cmdk-list" id="cmdkList"></div>
+    <div class="cmdk-foot"><span>↑↓ 选择</span><span>Enter 打开</span><span>Esc 关闭</span></div>
+  </div>
+</div>
+
 <script src="assets/config.js"></script>
-<script src="assets/api.js"></script>
-<script src="assets/admin.js"></script>
+<script src="assets/api.js?v=2.0.0"></script>
+<script src="assets/admin.js?v=2.0.0"></script>
 </body>
 </html>

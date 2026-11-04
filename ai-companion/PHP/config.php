@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '1.9.0';
+const LUMI_VERSION = '2.0.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -270,6 +270,7 @@ function lumi_init_db(PDO $pdo): void
         content TEXT NOT NULL,
         level TEXT DEFAULT 'info',
         active INTEGER DEFAULT 1,
+        starts_at INTEGER DEFAULT 0,
         expires_at INTEGER DEFAULT 0,
         created_by TEXT DEFAULT '',
         created_at INTEGER NOT NULL
@@ -313,6 +314,18 @@ function lumi_init_db(PDO $pdo): void
     ");
 
     lumi_seed($pdo);
+    lumi_migrate_db($pdo);
+}
+
+function lumi_migrate_db(PDO $pdo): void
+{
+    $columns = [];
+    foreach ($pdo->query("PRAGMA table_info(announcements)")->fetchAll() as $row) {
+        $columns[(string)$row['name']] = true;
+    }
+    if (!isset($columns['starts_at'])) {
+        $pdo->exec("ALTER TABLE announcements ADD COLUMN starts_at INTEGER DEFAULT 0");
+    }
 }
 
 function lumi_default_settings(): array
