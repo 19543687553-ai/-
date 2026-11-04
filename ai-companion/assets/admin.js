@@ -53,7 +53,7 @@
     filters: {
       users: { q: '', status: 'all', page: 1 },
       conversations: { q: '', page: 1 },
-      messages: { q: '', role: '', from: '', to: '', page: 1 },
+      messages: { q: '', role: '', from: '', to: '', flagged: '', page: 1 },
       feedbacks: { status: 'all', page: 1 },
       audit: { q: '', page: 1 }
     },
@@ -404,6 +404,7 @@
           ${statCard('activity', '今日活跃', s.active_today, '消息今日 ' + s.message_today + ' 条', true)}
           ${statCard('message', '消息总量', s.message_total, '平均亲密度 ' + s.avg_affection)}
           ${statCard('banUser', '封禁中', s.banned, '待处理反馈 ' + s.open_feedback)}
+          ${statCard('shield', '待复核风险', s.flagged_messages, '敏感词命中消息')}
         </div>
         <div class="grid-1-2">
           <div class="panel">
@@ -578,7 +579,7 @@
     const f = state.filters.messages;
     const from = f.from ? Math.floor(new Date(f.from + 'T00:00:00').getTime() / 1000) : 0;
     const to = f.to ? Math.floor(new Date(f.to + 'T23:59:59').getTime() / 1000) : 0;
-    const data = await api('adminMessages', { q: f.q, role: f.role, from: from, to: to, page: f.page, per_page: 30 });
+    const data = await api('adminMessages', { q: f.q, role: f.role, from: from, to: to, flagged: f.flagged, page: f.page, per_page: 30 });
     if (f.page > data.pages) { f.page = data.pages; return loadView('messages'); }
     box.innerHTML = `
       <div class="section-grid">
@@ -588,6 +589,10 @@
           </label>
           <select data-filter="messages:role" aria-label="角色">
             ${['', 'user', 'assistant', 'proactive', 'system'].map((r) => `<option value="${r}" ${f.role === r ? 'selected' : ''}>${r ? ROLE_BADGE[r] : '全部角色'}</option>`).join('')}
+          </select>
+          <select data-filter="messages:flagged" aria-label="风险标记">
+            <option value="">全部消息</option>
+            <option value="1" ${f.flagged === '1' ? 'selected' : ''}>仅看风险标记</option>
           </select>
           <input type="date" value="${esc(f.from)}" data-filter="messages:from" aria-label="开始日期">
           <input type="date" value="${esc(f.to)}" data-filter="messages:to" aria-label="结束日期">
@@ -605,9 +610,11 @@
                       <div class="cell-sub">@${esc(m.username || '')} · ID ${m.user_id}</div></td>
                     <td>${roleBadge(m.role)}</td>
                     <td><div class="cell-ellipsis" title="${esc(m.content)}">${esc(m.content)}</div>
-                      ${m.pinned ? '<span class="pinned-mark">★ 已精选</span>' : ''}</td>
+                      ${m.pinned ? '<span class="pinned-mark">★ 已精选</span>' : ''}
+                      ${m.meta && m.meta.flagged ? `<span class="badge warn" title="命中规则">风险 · ${esc(m.meta.matched || m.meta.category || '复核')}</span>` : ''}</td>
                     <td class="cell-sub">${UI.formatDateTime(m.created_at)}</td>
                     <td><div class="cell-actions">
+                      ${m.meta && m.meta.flagged ? `<button class="mini-btn accent" data-act="msg-review" data-id="${m.id}">${UI.icon('check', 13)}已复核</button>` : ''}
                       <button class="mini-btn" data-act="msg-pin" data-id="${m.id}" data-pinned="${m.pinned ? 0 : 1}">${UI.icon('pin', 13)}${m.pinned ? '取消精选' : '精选'}</button>
                       <button class="mini-btn danger" data-act="msg-del" data-id="${m.id}">${UI.icon('trash', 13)}删除</button>
                     </div></td>
@@ -2139,6 +2146,7 @@
       case 'user-unban': handleUnban(id); break;
       case 'conv-open': openDrawer(id, 'messages'); break;
       case 'msg-pin': togglePin(id, actionEl.dataset.pinned === '1'); break;
+      case 'msg-review': reviewMessage(id); break;
       case 'msg-del': deleteMessage(id); break;
       case 'ann-new': announcementModal(null); break;
       case 'ann-edit': {
@@ -2184,6 +2192,17 @@
       if (state.drawer) refreshDrawer();
     } catch (err) {
       UI.toast(err.message || '操作失败', 'error');
+    }
+  }
+
+  async function reviewMessage(messageId) {
+    try {
+      await api('adminClearMessageFlag', { message_id: messageId });
+      UI.toast('已标记为复核完成', 'success');
+      loadView(state.view);
+      if (state.drawer) refreshDrawer();
+    } catch (err) {
+      UI.toast(err.message || '复核失败', 'error');
     }
   }
 
@@ -2321,6 +2340,7 @@
     if (inner && state.drawer) {
       const innerAct = inner.dataset.act;
       if (innerAct === 'msg-pin') { togglePin(Number(inner.dataset.id), inner.dataset.pinned === '1'); return; }
+      if (innerAct === 'msg-review') { reviewMessage(Number(inner.dataset.id)); return; }
       if (innerAct === 'msg-del') { deleteMessage(Number(inner.dataset.id)); return; }
     }
     const actionEl = event.target.closest('[data-drawer-act]');

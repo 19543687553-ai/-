@@ -84,6 +84,7 @@ try {
         case 'adminConversations':     lumi_action_admin_conversations(); break;
         case 'adminMessages':          lumi_action_admin_messages(); break;
         case 'adminDeleteMessage':     lumi_action_admin_delete_message(); break;
+        case 'adminClearMessageFlag':  lumi_action_admin_clear_message_flag(); break;
         case 'adminPinMessage':        lumi_action_admin_pin_message(); break;
         case 'adminSendMessage':       lumi_action_admin_send_message(); break;
         case 'adminMoodAnalytics':     lumi_action_admin_mood_analytics(); break;
@@ -1436,6 +1437,7 @@ function lumi_action_admin_stats(): void
     $avgAffection = (float)$pdo->query("SELECT COALESCE(AVG(affection),0) FROM users WHERE status!='deleted'")->fetchColumn();
     $openFeedback = (int)$pdo->query("SELECT COUNT(*) FROM feedbacks WHERE status='open'")->fetchColumn();
     $activeAnnouncements = (int)$pdo->query("SELECT COUNT(*) FROM announcements WHERE active=1 AND (expires_at=0 OR expires_at> $now)")->fetchColumn();
+    $flaggedMessages = (int)$pdo->query("SELECT COUNT(*) FROM messages WHERE role='user' AND (meta LIKE '%\"flagged\":true%' OR meta LIKE '%\"flagged\": true%')")->fetchColumn();
 
     $days = [];
     for ($i = 13; $i >= 0; $i--) {
@@ -1482,6 +1484,7 @@ function lumi_action_admin_stats(): void
             'banned' => $banned, 'message_total' => $messageTotal, 'message_today' => $messageToday,
             'avg_affection' => round($avgAffection, 1), 'open_feedback' => $openFeedback,
             'announcements' => $activeAnnouncements, 'model_configured' => lumi_model_config()['configured'],
+            'flagged_messages' => $flaggedMessages,
             'db_size' => $dbSize, 'version' => LUMI_VERSION,
         ],
         'series' => array_values($days),
@@ -1842,6 +1845,9 @@ function lumi_action_admin_messages(): void
     if (in_array($role, ['user', 'assistant', 'proactive', 'system'], true)) { $where[] = 'm.role=?'; $params[] = $role; }
     if ($from > 0) { $where[] = 'm.created_at>=?'; $params[] = $from; }
     if ($to > 0) { $where[] = 'm.created_at<=?'; $params[] = $to; }
+    if ((int)lumi_param('flagged', 0) === 1) {
+        $where[] = "m.role='user' AND (m.meta LIKE '%\"flagged\":true%' OR m.meta LIKE '%\"flagged\": true%')";
+    }
     $whereSql = implode(' AND ', $where);
     $countSt = $pdo->prepare("SELECT COUNT(*) FROM messages m JOIN users u ON u.id=m.user_id WHERE $whereSql");
     $countSt->execute($params);
@@ -1875,6 +1881,27 @@ function lumi_action_admin_delete_message(): void
     $pdo->prepare("UPDATE users SET total_messages=MAX(0, total_messages-1) WHERE id=?")->execute([(int)$message['user_id']]);
     lumi_audit($admin, 'message.delete', 'message', (string)$messageId, '删除用户 ' . $message['user_id'] . ' 的一条消息');
     lumi_ok([], '消息已删除');
+}
+
+function lumi_action_admin_clear_message_flag(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin', 'moderator']);
+    $messageId = (int)lumi_param('message_id', 0);
+    $pdo = lumi_db();
+    $st = $pdo->prepare("SELECT * FROM messages WHERE id=?");
+    $st->execute([$messageId]);
+    $message = $st->fetch();
+    if (!$message) lumi_err('消息不存在', 404);
+    $meta = json_decode((string)$message['meta'], true);
+    if (!is_array($meta) || empty($meta['flagged'])) {
+        lumi_err('这条消息没有风险标记', 422);
+    }
+    unset($meta['flagged'], $meta['matched'], $meta['category'], $meta['reviewed_by'], $meta['reviewed_at']);
+    $meta['reviewed_by'] = (string)$admin['username'];
+    $meta['reviewed_at'] = time();
+    $pdo->prepare("UPDATE messages SET meta=? WHERE id=?")->execute([json_encode($meta, JSON_UNESCAPED_UNICODE), $messageId]);
+    lumi_audit($admin, 'message.review', 'message', (string)$messageId, '复核用户 ' . $message['user_id'] . ' 的风险消息');
+    lumi_ok([], '已标记为复核完成');
 }
 
 function lumi_action_admin_pin_message(): void

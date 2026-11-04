@@ -1,7 +1,7 @@
 # 心屿 · AI 情感陪伴机器人 — 交接文档
 
 > 面向下一个接手本项目的 AI / 工程师。请先完整读完本文件，再动代码。
-> 最后更新：2026-11-04 · 版本：v1.8.0
+> 最后更新：2026-11-04 · 版本：v1.9.0
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前状态与交付物
 
-- 版本：`v1.8.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
-- 安装包：`/workspace/AI 情感陪伴-v1.8.0.zip`（**不含** `PHP/data/`）
+- 版本：`v1.9.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 登录页脚、压缩包文件名三处需一致）
+- 安装包：`/workspace/AI 情感陪伴-v1.9.0.zip`（**不含** `PHP/data/`）
 - 默认账号：
   - 管理员：`zrl / 201354`（首次建库时写入，可用环境变量覆盖）
   - 体验用户：`demo / demo123`（昵称「晚晚」，有 12 条种子对话与 14 天情绪记录）
@@ -30,7 +30,7 @@
   - 另一用户：`chen / demo123`
 - 模型：默认 DeepSeek 预设，但**未配置 Key**，因此默认走离线陪伴模板。真实对话需在后台「模型配置」填 Key。
 
-功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板**、**全站维护页（自定义原因与预计恢复时间，登录/注册/聊天实时拦截）**、**安全词库归一化匹配（空格/标点/零宽字符规避也会拦截，覆盖聊天/注册/资料/签到/反馈）**、**后台安全词拦截测试器** —— 均已实现，后端冒烟与浏览器验证通过。
+功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板**、**全站维护页（自定义原因与预计恢复时间，登录/注册/聊天实时拦截）**、**安全词库归一化匹配（空格/标点/零宽字符规避也会拦截，覆盖聊天/注册/资料/签到/反馈）**、**后台安全词拦截测试器**、**风险消息复核队列（仪表盘计数、消息筛选、命中标记与一键复核）** —— 均已实现，后端冒烟与浏览器验证通过。
 
 ---
 
@@ -120,7 +120,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 `chat`、`gesture`、`poll`、`history`、`markRead`、`insights`、`checkin`、`checkinToday`、`searchMessages`、`exportChat`、`pinMessage`、`feedbackCreate`、`feedbackList`、`journals`、`journalToday`
 
 ### 后台
-`adminLogin`、`adminLogout`、`adminMe`、`adminStats`、`adminUsers`、`adminUserDetail`、`adminUpdateUser`、`adminBanUser`、`adminUnbanUser`、`adminResetPassword`、`adminDeleteUser`、`adminConversations`、`adminMessages`、`adminDeleteMessage`、`adminPinMessage`、`adminSendMessage`、`adminMoodAnalytics`、`adminSettings`、`adminSaveSettings`、`adminModelSave`、`adminModelTest`、`adminModelList`、`adminAnnouncements`、`adminAnnouncementSave`、`adminAnnouncementDelete`、`adminWords`、`adminWordSave`、`adminWordDelete`、`adminTestSafety`、`adminFeedbacks`、`adminFeedbackReply`、`adminAdmins`、`adminAdminSave`、`adminAdminDelete`、`adminAuditLogs`、`adminBroadcast`、`adminBackup`、`adminExportUsers`、`adminSystemInfo`
+`adminLogin`、`adminLogout`、`adminMe`、`adminStats`、`adminUsers`、`adminUserDetail`、`adminUpdateUser`、`adminBanUser`、`adminUnbanUser`、`adminResetPassword`、`adminDeleteUser`、`adminConversations`、`adminMessages`、`adminDeleteMessage`、`adminClearMessageFlag`、`adminPinMessage`、`adminSendMessage`、`adminMoodAnalytics`、`adminSettings`、`adminSaveSettings`、`adminModelSave`、`adminModelTest`、`adminModelList`、`adminAnnouncements`、`adminAnnouncementSave`、`adminAnnouncementDelete`、`adminWords`、`adminWordSave`、`adminWordDelete`、`adminTestSafety`、`adminFeedbacks`、`adminFeedbackReply`、`adminAdmins`、`adminAdminSave`、`adminAdminDelete`、`adminAuditLogs`、`adminBroadcast`、`adminBackup`、`adminExportUsers`、`adminSystemInfo`
 
 几个容易记错的返回结构：
 
@@ -291,6 +291,8 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 
 **安全词覆盖与测试器（v1.8.0）**：`lumi_assert_safe()` 统一处理用户输入，已接入注册用户名/昵称、资料页昵称/陪伴者名字/人格设定/简介、签到备注、反馈内容，以及原有聊天。后台「安全词库」新增拦截测试器（`adminTestSafety`, 输入一段话即时返回 `allowed/flagged/matched/normalized`），并展示当前维护模式状态与预计恢复时间。注意 `lumi_assert_safe()` 只向前端返回 `flagged: true`，不暴露命中的具体词条；管理员测试接口才返回 `matched`。
 
+**风险消息复核（v1.9.0）**：聊天命中 `review` 规则时，`messages.meta` 保存 `flagged/matched/category`。`adminStats` 新增 `flagged_messages` 计数，后台仪表盘展示「待复核风险」卡片；消息检索新增 `flagged=1` 筛选与「风险 · 词条」徽章；`adminClearMessageFlag` 会清除 `flagged/matched/category` 并写入 `reviewed_by/reviewed_at`，列表中的「已复核」按钮调用它，复核动作写入审计日志 `message.review`。
+
 ---
 
 ## 8. 踩过的坑（务必不要回归）
@@ -383,6 +385,10 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
    - `adminTestSafety('帮我 代.开 发~票')` 返回 `allowed=false, matched=代开发票, normalized=帮我代开发票`；
    - `updateProfile` 昵称、`checkin` 备注、`feedbackCreate` 内容、`register` 昵称含规避写法时均返回 422 且 `data.flagged=true`；
    - 浏览器：后台安全词库页的「拦截测试」输入并点击测试显示「会被拦截」，控制台 0 报错。
+14. v1.9.0 新增回归：
+   - 命中 `review` 词的消息可在 `adminMessages&flagged=1` 中查到，`adminStats` 的 `flagged_messages` 同步计数；
+   - `adminClearMessageFlag` 返回成功后，该消息不再出现在 `flagged=1` 列表，`flagged_messages` 归零；
+   - 浏览器：消息检索选择「仅看风险标记」能看到风险徽章，点击「已复核」后行消失，控制台 0 报错。
 
 ---
 
@@ -395,7 +401,7 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 ```
 
 - 不打包 `PHP/data/`（首次部署自动生成）。
-- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.8.0）。
+- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v1.9.0）。
 - 打包后记录 SHA-256，方便校验。
 
 ---
