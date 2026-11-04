@@ -50,6 +50,9 @@ try {
         case 'updateProfile':          lumi_action_update_profile(); break;
         case 'changePassword':         lumi_action_change_password(); break;
         case 'deleteAccount':          lumi_action_delete_account(); break;
+        case 'securitySessions':       lumi_action_security_sessions(); break;
+        case 'securityRevokeSession':  lumi_action_security_revoke_session(); break;
+        case 'securityLogoutOthers':   lumi_action_security_logout_others(); break;
 
         // ---------- 陪伴 ----------
         case 'chat':                   lumi_action_chat(); break;
@@ -65,6 +68,7 @@ try {
         case 'checkinToday':           lumi_action_checkin_today(); break;
         case 'searchMessages':         lumi_action_search_messages(); break;
         case 'exportChat':             lumi_action_export_chat(); break;
+        case 'exportAccount':          lumi_action_export_account(); break;
         case 'pinMessage':             lumi_action_pin_message(); break;
         case 'feedbackCreate':         lumi_action_feedback_create(); break;
         case 'feedbackList':           lumi_action_feedback_list(); break;
@@ -347,6 +351,53 @@ function lumi_action_logout(): void
         lumi_db()->prepare("DELETE FROM user_sessions WHERE token_hash=?")->execute([hash('sha256', $token)]);
     }
     lumi_ok([], '已退出登录');
+}
+
+function lumi_action_security_sessions(): void
+{
+    $user = lumi_require_user();
+    $tokenHash = hash('sha256', lumi_bearer());
+    $pdo = lumi_db();
+    $now = time();
+    $st = $pdo->prepare("SELECT id, token_hash, ip, user_agent, created_at, last_seen_at, expires_at FROM user_sessions WHERE user_id=? AND expires_at>? ORDER BY last_seen_at DESC LIMIT 20");
+    $st->execute([(int)$user['id'], $now]);
+    $items = [];
+    foreach ($st->fetchAll() as $row) {
+        $items[] = [
+            'id' => (int)$row['id'],
+            'ip' => (string)$row['ip'],
+            'user_agent' => (string)$row['user_agent'],
+            'created_at' => (int)$row['created_at'],
+            'last_seen_at' => (int)$row['last_seen_at'],
+            'current' => hash_equals((string)$row['token_hash'], $tokenHash),
+        ];
+    }
+    lumi_ok(['sessions' => $items]);
+}
+
+function lumi_action_security_revoke_session(): void
+{
+    $user = lumi_require_user();
+    $sessionId = (int)lumi_param('session_id', 0);
+    if ($sessionId <= 0) lumi_err('设备不存在');
+    $tokenHash = hash('sha256', lumi_bearer());
+    $pdo = lumi_db();
+    $st = $pdo->prepare("SELECT token_hash FROM user_sessions WHERE id=? AND user_id=? LIMIT 1");
+    $st->execute([$sessionId, (int)$user['id']]);
+    $row = $st->fetch();
+    if (!$row) lumi_err('设备不存在或已下线', 404);
+    if (hash_equals((string)$row['token_hash'], $tokenHash)) lumi_err('当前设备不能在这里退出，请使用退出登录');
+    $pdo->prepare("DELETE FROM user_sessions WHERE id=? AND user_id=?")->execute([$sessionId, (int)$user['id']]);
+    lumi_ok([], '该设备已退出登录');
+}
+
+function lumi_action_security_logout_others(): void
+{
+    $user = lumi_require_user();
+    $tokenHash = hash('sha256', lumi_bearer());
+    $st = lumi_db()->prepare("DELETE FROM user_sessions WHERE user_id=? AND token_hash<>?");
+    $st->execute([(int)$user['id'], $tokenHash]);
+    lumi_ok(['removed' => $st->rowCount()], '其他设备已全部退出');
 }
 
 function lumi_action_me(): void
@@ -1313,6 +1364,56 @@ function lumi_action_export_chat(): void
         'content' => implode("\n", $lines),
         'count' => count($rows),
     ]);
+}
+
+function lumi_action_export_account(): void
+{
+    $user = lumi_require_user();
+    $pdo = lumi_db();
+    $userId = (int)$user['id'];
+
+    $messages = $pdo->prepare("SELECT id, conversation_id, role, content, emotion, mood_after, is_read, pinned, created_at FROM messages WHERE user_id=? ORDER BY id ASC LIMIT 10000");
+    $messages->execute([$userId]);
+    $messageRows = $messages->fetchAll();
+
+    $checkins = $pdo->prepare("SELECT * FROM checkins WHERE user_id=? ORDER BY id ASC");
+    $checkins->execute([$userId]);
+
+    $moods = $pdo->prepare("SELECT * FROM mood_logs WHERE user_id=? ORDER BY id ASC");
+    $moods->execute([$userId]);
+
+    $journals = $pdo->prepare("SELECT * FROM journals WHERE user_id=? ORDER BY id ASC");
+    $journals->execute([$userId]);
+
+    $feedbacks = $pdo->prepare("SELECT * FROM feedbacks WHERE user_id=? ORDER BY id ASC");
+    $feedbacks->execute([$userId]);
+
+    $payload = [
+        'app' => '心屿',
+        'version' => LUMI_VERSION,
+        'exported_at' => lumi_now_text(),
+        'profile' => lumi_public_user($user),
+        'state' => lumi_public_state($user),
+        'messages' => $messageRows,
+        'checkins' => $checkins->fetchAll(),
+        'mood_logs' => $moods->fetchAll(),
+        'journals' => $journals->fetchAll(),
+        'feedbacks' => $feedbacks->fetchAll(),
+    ];
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    if ($json === false) lumi_err('数据导出失败，请稍后再试', 500);
+
+    lumi_ok([
+        'filename' => '心屿-我的数据-' . date('Ymd') . '.json',
+        'content' => $json,
+        'counts' => [
+            'messages' => count($messageRows),
+            'checkins' => count($payload['checkins']),
+            'mood_logs' => count($payload['mood_logs']),
+            'journals' => count($payload['journals']),
+            'feedbacks' => count($payload['feedbacks']),
+        ],
+    ], '数据副本已生成');
 }
 
 function lumi_action_pin_message(): void

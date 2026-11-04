@@ -7,7 +7,7 @@
   <meta name="description" content="心屿 · 一个会记得你情绪、也会主动走向你的 AI 情感陪伴空间。">
   <title>心屿 · 和小屿待一会儿</title>
   <link rel="stylesheet" href="assets/base.css">
-  <link rel="stylesheet" href="assets/app.css">
+  <link rel="stylesheet" href="assets/app.css?v=2.1.0">
 </head>
 <body class="app-body">
   <div class="app-shell" id="appShell">
@@ -331,6 +331,23 @@
           </div>
 
           <div class="card">
+            <div class="card-head">
+              <div><h4>登录设备</h4><p>只保留你信任的设备，其他设备可随时下线</p></div>
+              <button class="mini-btn" id="refreshSessions" type="button">刷新</button>
+            </div>
+            <div class="session-list" id="sessionList"><div class="session-empty">正在读取登录设备…</div></div>
+            <div class="form-foot"><button class="btn btn-ghost" id="logoutOthers" type="button">退出其它设备</button></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div><h4>我的数据</h4><p>导出你的资料、对话、签到与心情记录</p></div>
+            </div>
+            <div class="form-note">数据副本为 JSON 文件，只会在你的设备上生成，不会发送给其他人。</div>
+            <div class="form-foot"><button class="btn btn-ghost" id="exportMyData" type="button">下载数据副本</button></div>
+          </div>
+
+          <div class="card">
             <div class="card-head"><div><h4>想对主理人说的话</h4><p>建议、问题，或只是想说一声</p></div></div>
             <div class="form-grid">
               <div class="field">
@@ -470,7 +487,7 @@
   </div>
 
   <script src="assets/config.js"></script>
-  <script src="assets/api.js"></script>
-  <script src="assets/app.js"></script>
+  <script src="assets/api.js?v=2.1.0"></script>
+  <script src="assets/app.js?v=2.1.0"></script>
 </body>
 </html>

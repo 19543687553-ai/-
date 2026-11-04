@@ -405,6 +405,13 @@
     });
     $('#changePassword').addEventListener('click', changePassword);
     $('#deleteAccount').addEventListener('click', deleteAccount);
+    $('#refreshSessions').addEventListener('click', loadSessions);
+    $('#logoutOthers').addEventListener('click', logoutOtherDevices);
+    $('#exportMyData').addEventListener('click', exportMyData);
+    $('#sessionList').addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-revoke]');
+      if (btn) revokeSession(btn.dataset.revoke);
+    });
     $('#submitFeedback').addEventListener('click', submitFeedback);
 
     $$('#bubbleStyle button').forEach((btn) => {
@@ -1704,6 +1711,7 @@
     $$('#bubbleStyle button').forEach((b) => b.classList.toggle('active', b.dataset.value === (u.bubble_style || 'soft')));
     $$('#replyStyle button').forEach((b) => b.classList.toggle('active', b.dataset.value === (prefs.reply_style || 'balanced')));
     syncThemeUI();
+    loadSessions();
   }
 
   function profilePayload() {
@@ -1785,6 +1793,96 @@
       UI.toast('密码已更新', 'success');
     } catch (err) {
       UI.toast(err.message || '密码没能更新', 'error');
+    }
+  }
+
+  function deviceLabel(userAgent) {
+    const ua = userAgent || '';
+    const browser = /Edg\//.test(ua) ? 'Edge'
+      : /Firefox\//.test(ua) ? 'Firefox'
+      : /Chrome\//.test(ua) ? 'Chrome'
+      : /Safari\//.test(ua) ? 'Safari'
+      : '浏览器';
+    const os = /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+      : /Android/.test(ua) ? 'Android'
+      : /Windows/.test(ua) ? 'Windows'
+      : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
+      : /Linux/.test(ua) ? 'Linux'
+      : '';
+    return os ? browser + ' · ' + os : browser;
+  }
+
+  async function loadSessions() {
+    const box = $('#sessionList');
+    if (!box || !state.user) return;
+    try {
+      const data = await LumiAPI.request('securitySessions');
+      const sessions = data.sessions || [];
+      box.innerHTML = sessions.length ? sessions.map((item) => `
+        <div class="session-item">
+          <div class="session-copy">
+            <div class="session-title"><b>${UI.escapeHTML(deviceLabel(item.user_agent))}</b>${item.current ? '<em class="session-badge">当前设备</em>' : ''}</div>
+            <span>${UI.escapeHTML(item.ip || '未知 IP')} · 最近活动 ${UI.relativeTime(item.last_seen_at)}</span>
+          </div>
+          ${item.current ? '' : `<button class="btn btn-ghost btn-sm" type="button" data-revoke="${item.id}">下线</button>`}
+        </div>`).join('') : '<div class="session-empty">暂时没有其他登录设备</div>';
+    } catch (err) {
+      box.innerHTML = '<div class="session-empty">' + UI.escapeHTML(err.message || '读取失败') + '</div>';
+    }
+  }
+
+  async function revokeSession(sessionId) {
+    try {
+      await LumiAPI.request('securityRevokeSession', { session_id: Number(sessionId) });
+      UI.toast('该设备已退出登录', 'success');
+      loadSessions();
+    } catch (err) {
+      UI.toast(err.message || '操作失败', 'error');
+    }
+  }
+
+  async function logoutOtherDevices() {
+    const ok = await confirmDialog({
+      title: '退出其它设备',
+      message: '除了当前设备，其他已登录设备都会立即下线。',
+      confirmText: '全部下线',
+      danger: false
+    });
+    if (!ok) return;
+    try {
+      const data = await LumiAPI.request('securityLogoutOthers');
+      UI.toast((data.removed || 0) > 0 ? '其他设备已全部退出' : '没有需要下线的设备', 'success');
+      loadSessions();
+    } catch (err) {
+      UI.toast(err.message || '操作失败', 'error');
+    }
+  }
+
+  async function exportMyData() {
+    const btn = $('#exportMyData');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '正在打包…';
+    }
+    try {
+      const data = await LumiAPI.request('exportAccount', {}, { timeout: 30000 });
+      const blob = new Blob([data.content || '{}'], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename || '心屿-我的数据.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      UI.toast('数据副本已开始下载', 'success');
+    } catch (err) {
+      UI.toast(err.message || '导出失败', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '下载数据副本';
+      }
     }
   }
 
