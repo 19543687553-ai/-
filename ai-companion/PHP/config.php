@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '2.4.0';
+const LUMI_VERSION = '2.5.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -36,9 +36,25 @@ function lumi_data_dir(): string
     if ($dir !== null) {
         return $dir;
     }
-    $dir = __DIR__ . '/data';
+    $dir = dirname(__DIR__) . '/data';
+    $legacy = __DIR__ . '/data';
+    if (!is_dir($dir) && is_dir($legacy)) {
+        if (!@rename($legacy, $dir)) {
+            @mkdir($dir, 0755, true);
+        }
+    }
     if (!is_dir($dir)) {
         @mkdir($dir, 0755, true);
+    }
+    if (is_file($legacy . '/companion.sqlite') && !is_file($dir . '/companion.sqlite')) {
+        foreach (['companion.sqlite', 'companion.sqlite-wal', 'companion.sqlite-shm', '.app_secret'] as $name) {
+            if (is_file($legacy . '/' . $name)) {
+                @copy($legacy . '/' . $name, $dir . '/' . $name);
+            }
+        }
+        if (is_file($dir . '/.app_secret')) {
+            @chmod($dir . '/.app_secret', 0600);
+        }
     }
     return $dir;
 }

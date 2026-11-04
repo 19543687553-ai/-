@@ -1,7 +1,7 @@
 # 心屿 · AI 情感陪伴机器人 — 交接文档
 
 > 面向下一个接手本项目的 AI / 工程师。请先完整读完本文件，再动代码。
-> 最后更新：2026-11-05 · 版本：v2.4.0
+> 最后更新：2026-11-05 · 版本：v2.5.0
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前状态与交付物
 
-- 版本：`v2.4.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名三处需一致）
-- 安装包：`/workspace/AI 情感陪伴-v2.4.0.zip`（**不含** `PHP/data/`）
+- 版本：`v2.5.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名三处需一致）
+- 安装包：`/workspace/AI 情感陪伴-v2.5.0.zip`（**不含** `data/`）
 - 默认账号：
   - 管理员：`zrl / 201354`（首次建库时写入，可用环境变量覆盖）
   - 体验用户：`demo / demo123`（昵称「晚晚」，有 12 条种子对话与 14 天情绪记录）
@@ -30,7 +30,7 @@
   - 另一用户：`chen / demo123`
 - 模型：默认 DeepSeek 预设，但**未配置 Key**，因此默认走离线陪伴模板。真实对话需在后台「模型配置」填 Key。
 
-功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板**、**全站维护页（自定义原因与预计恢复时间，登录/注册/聊天实时拦截）**、**安全词库归一化匹配（空格/标点/零宽字符规避也会拦截，覆盖聊天/注册/资料/签到/反馈）**、**后台安全词拦截测试器**、**风险消息复核队列（仪表盘计数、消息筛选、命中标记与一键复核）**、**v2.0 全新运营控制台（问候 Hero、快捷入口、安全态势、风险分类与最新命中）**、**Ctrl+K 命令面板**、**公告定时发布（开始展示/自动下线）**、**数据库体检（过期会话清理 / 限流表清理 / quick_check / PRAGMA optimize）**、**登录设备管理（查看设备 / 单设备下线 / 退出其它设备）**、**个人数据副本导出（JSON）**、**远程敏感词接口（免注册 / 免 Key，命中仅复核）**、**远程词库一键导入与清空（仅删除远程来源，保留手动规则）**、**旧版安全词表自动补列（source / updated_at）**、**安全词批量导入 / JSON 导出**、**命中记录与近 7 天统计（按场景、来源、动作）**、**规则启用/停用开关（旧表自动补 enabled）**、**命中记录场景/来源筛选、分页与导出** —— 均已实现，后端冒烟与浏览器验证通过。
+功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板**、**全站维护页（自定义原因与预计恢复时间，登录/注册/聊天实时拦截）**、**安全词库归一化匹配（空格/标点/零宽字符规避也会拦截，覆盖聊天/注册/资料/签到/反馈）**、**后台安全词拦截测试器**、**风险消息复核队列（仪表盘计数、消息筛选、命中标记与一键复核）**、**v2.0 全新运营控制台（问候 Hero、快捷入口、安全态势、风险分类与最新命中）**、**Ctrl+K 命令面板**、**公告定时发布（开始展示/自动下线）**、**数据库体检（过期会话清理 / 限流表清理 / quick_check / PRAGMA optimize）**、**登录设备管理（查看设备 / 单设备下线 / 退出其它设备）**、**个人数据副本导出（JSON）**、**远程敏感词接口（免注册 / 免 Key，命中仅复核）**、**远程词库一键导入与清空（仅删除远程来源，保留手动规则）**、**旧版安全词表自动补列（source / updated_at）**、**安全词批量导入 / JSON 导出**、**命中记录与近 7 天统计（按场景、来源、动作）**、**规则启用/停用开关（旧表自动补 enabled）**、**命中记录场景/来源筛选、分页与导出**、**运行时数据迁至根 `data/`（旧 `PHP/data` 自动迁移，根 `.htaccess` 防护）** —— 均已实现，后端冒烟与浏览器验证通过。
 
 ---
 
@@ -50,8 +50,8 @@ php -S 0.0.0.0:8080 -t .
 
 1. 把 `ai-companion/` 内的 `index.html`、`app.html`、`admin.html`、`assets/` 放到站点根目录；
 2. 把 `PHP/` 整个目录放到根目录下（即 `/PHP/api.php` 可访问）；
-3. 确保 `PHP/data/` 可写（不存在会自动创建），首次访问自动建表 + 写种子数据；
-4. `PHP/.htaccess` 已禁止访问 `data/`、`.app_secret`、`*.sqlite`、`*.log`；Nginx 需自行加等价规则；
+3. 确保项目根 `data/` 可写（不存在会自动创建），首次访问自动建表 + 写种子数据；旧版 `PHP/data/` 会在首次访问时自动迁移到 `data/`；
+4. 根目录 `.htaccess` 已拒绝访问 `data/`、`.app_secret`、`*.sqlite`、`*.log`（`PHP/.htaccess` 仅作旧路径兜底）；Nginx 需自行加等价规则；
 5. 若前端与后端不同域/不同目录，在加载 `assets/config.js` 前设置 `window.LUMI_API_OVERRIDE = 'https://.../PHP/api.php'`。
 
 ### 关键约定
@@ -59,7 +59,8 @@ php -S 0.0.0.0:8080 -t .
 - 前端默认按 `['/PHP/api.php', 'PHP/api.php', '/api.php']` 依次探测（`assets/api.js` 的 `init()`），探测成功会写入 `localStorage`（键 `xinyu.apiBase`）。
 - 管理端与用户端是**两套独立 token**，分别存 `xinyu.admin.token` 与 `xinyu.token`。
 - 环境变量（可选）：`LUMI_SECRET`（加密主密钥，≥16 字符）、`LUMI_ADMIN_USERNAME`、`LUMI_ADMIN_PASSWORD`。
-- 不要提交 `PHP/data/`（数据库、`.app_secret`、日志）到仓库。
+- 不要提交 `data/`（数据库、`.app_secret`、日志）到仓库。
+- 根目录 `.htaccess` 已拒绝 `/data/`、`*.sqlite`、`.app_secret`、`*.log`；**Apache 需 `AllowOverride` 生效**，Nginx 需自行加 `location ^~ /data/ { deny all; }` 与 sqlite/log 拒绝规则（PHP 内置服务器不读取 `.htaccess`）。
 
 ---
 
@@ -73,7 +74,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
    ├─ PHP/config.php   常量 / DB / 建表 / 设置 / 认证 / 加密 / 封禁 / 限流 / 审计
    └─ PHP/emotion.php  情绪分析、情绪衰减、提示词、模型调用、降级回复、主动消息
         ▼
-   SQLite（PHP/data/companion.sqlite，WAL + busy_timeout）
+   SQLite（data/companion.sqlite，WAL + busy_timeout）
 ```
 
 ### 认证
@@ -85,7 +86,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 
 ### 加密
 
-模型 API Key 用 AES-256-GCM（`openssl_encrypt`，随机 IV + tag）加密入库；主密钥来自 `LUMI_SECRET` 或 `PHP/data/.app_secret`。后台只返回掩码（`lumi_mask_key`），任何接口都不回显明文。
+模型 API Key 用 AES-256-GCM（`openssl_encrypt`，随机 IV + tag）加密入库；主密钥来自 `LUMI_SECRET` 或 `data/.app_secret`。后台只返回掩码（`lumi_mask_key`），任何接口都不回显明文。
 
 ### 数据库表（18 张）
 
@@ -167,7 +168,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 | `start` | 用户消息已落库、开始生成前 | `conversation_id` |
 | `delta` | 模型/模板每出一段文本 | `text`（已剔除 `<mood>` 标签） |
 | `done` | 回复已落库 | `message`、`state`、`suggestions`、`degraded`、`model_configured`、`latency`、`flagged`、`unread_count` |
-| `error` | 生成中抛异常（同时写 `PHP/data/error.log`） | `msg` |
+| `error` | 生成中抛异常（同时写 `data/error.log`） | `msg` |
 
 - 服务端：`api.php` 的 `lumi_sse_start / lumi_sse_send / lumi_stream_filter / lumi_stream_text / lumi_stream_chat`；`lumi_action_chat()` 在保存用户消息后按 `stream` 分流。
 - 模型流式：`emotion.php` 的 `lumi_model_stream($messages, $onDelta, $override)`，`CURLOPT_WRITEFUNCTION` 逐行解析 `data:`，兼容服务商忽略 `stream` 返回普通 JSON（此时整段回调一次）。
@@ -324,6 +325,12 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 - 「命中记录」面板展示今日/近 7 天/拦截/远程/累计计数、Top 8 词条与最近 20 条记录；「清理 7 天前」调用 `adminClearSafetyHits`，最近记录保留。
 - 场景名来自 `lumi_assert_safe()` 的 `$what`（用户名/昵称/陪伴者名字/人格设定/简介/签到备注/反馈内容）或聊天固定为「聊天」。
 
+**数据目录迁移（v2.5.0）**：
+- `lumi_data_dir()` 改为项目根 `data/`（`dirname(__DIR__) . '/data'`），不再使用 `PHP/data`。
+- 首次调用时若根 `data/` 不存在且旧 `PHP/data/` 存在，优先 `rename` 整目录；失败则 `mkdir` 并复制 `companion.sqlite*` 与 `.app_secret`，并恢复密钥 `0600` 权限。
+- 新增项目根 `.htaccess`：`Options -Indexes`、`RewriteRule ^data/ - [F,L]`，并拒绝 `*.sqlite` / `*.sqlite-wal` / `*.sqlite-shm` / `.app_secret` / `*.log`。
+- 打包排除 `data/` 与旧 `PHP/data/`；`.gitignore` 同时忽略两者。
+
 **规则启停与命中运营（v2.4.0）**：
 - `sensitive_words.enabled` 默认 1；`lumi_check_safety()` 只加载 `enabled=1` 的规则，停用规则不参与匹配但保留历史与来源。
 - 旧库通过 `PRAGMA table_info(sensitive_words)` 自动补 `enabled INTEGER DEFAULT 1`，旧规则默认启用。
@@ -377,7 +384,9 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 | 旧库安全词页报 `no such column: source` | 旧表无 `source/updated_at` | `lumi_migrate_db()` 自动检测并 `ALTER TABLE` 补列 |
 | 远程词库导入后无法区分手动词 | 导入与手动写入同一张表 | `sensitive_words.source` 标记 `manual` / `remote`，清空只删远程 |
 | 命中记录面板一直为空 | 只有 `flagged=true` 才写 `safety_hits`，后台手动测试不记录 | 用真实聊天/资料/签到触发复核词后复查；`adminTestSafety` 仅用于规则调试 |
-| 后台新增面板看不到 | 浏览器缓存旧的 `admin.js` | 静态资源查询串随版本更新（v2.4.0），必要时硬刷新 |
+| 后台新增面板看不到 | 浏览器缓存旧的 `admin.js` | 静态资源查询串随版本更新（v2.5.0），必要时硬刷新 |
+| 旧站升级后数据不见了 | 仍去 `PHP/data` 找旧文件 | 首页请求会自动迁移到项目根 `data/`；确认 `PHP/data` 已不存在且根 `data/companion.sqlite` 时间戳不变 |
+| 根 `data/` 能被直接下载 | Nginx/内置服务器不读 `.htaccess` | Apache 确认 `AllowOverride`；Nginx 配 `location ^~ /data/ { deny all; }`；内置服务器仅用于开发 |
 | 规则停用后仍命中 | 旧库 `enabled` 未迁移 / 直接改了表未刷新缓存 | 启动后确认 `PRAGMA table_info(sensitive_words)` 有 `enabled`；`adminWordToggle` 返回 `{enabled}` |
 
 ---
@@ -462,6 +471,11 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
    - `adminSafetyHits` 传 `scene/source` 过滤后 `total` 正确，`page` 超界由前端回退；
    - `adminExportSafetyHits` 过滤导出 `count/content` 正确，`adminClearSafetyHits` 可清空；
    - 浏览器：规则表「状态」列、命中场景/来源筛选、分页、导出命中按钮均正常。
+21. v2.5.0 新增回归：
+   - 旧版存在 `PHP/data/companion.sqlite` 时首次请求后，`PHP/data` 消失、根 `data/companion.sqlite` 生成且修改时间保留；
+   - 旧账号可正常登录，`adminStats` / `adminWords` 正常返回；
+   - 根 `.htaccess` 存在且包含 `/data/`、`*.sqlite`、`.app_secret`、`*.log` 拒绝规则；
+   - 压缩包内不含 `data/` 与 `PHP/data/`；Apache 开启 `AllowOverride` 后 `/data/companion.sqlite` 返回 403（Nginx 按文档自测）。
 
 ---
 
@@ -469,12 +483,12 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 
 ```bash
 cd /workspace
-zip -r "AI 情感陪伴-v<版本>.zip" ai-companion -x "ai-companion/PHP/data/*"
+zip -r "AI 情感陪伴-v<版本>.zip" ai-companion -x "ai-companion/data/*" "ai-companion/PHP/data/*"
 unzip -t "AI 情感陪伴-v<版本>.zip"
 ```
 
-- 不打包 `PHP/data/`（首次部署自动生成）。
-- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v2.4.0）。
+- 不打包 `data/`（含旧版 `PHP/data/`，首次部署自动生成）。
+- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v2.5.0）。
 - 打包后记录 SHA-256，方便校验。
 
 ---
@@ -492,8 +506,9 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 - 备份接口直接下载 sqlite 文件，大库需改为分卷/定时备份。
 - 远程敏感词接口依赖服务器可出网；内网部署需配置 `HTTPS_PROXY` 或改用内网审核服务。PurgoMalum 主要覆盖英文，中文命中依赖导入词库；第三方误判只标记复核，不阻断对话。
 - `safety_hits` 会随使用增长；后台提供「清理 7 天前」，长期运营建议按月归档或限制保留天数。
+- 运行时数据默认在项目根 `data/companion.sqlite`；旧版 `PHP/data/` 首次访问时自动迁移（优先整目录 rename，失败则复制 sqlite 与 `.app_secret`）。
 - 仓库默认分支是 `master`，功能提交在 `trae/agent-*` 分支；确认合并后再交付。
-- `PHP/data/companion.sqlite` 曾被误提交，已从版本库移除并加入 `.gitignore`；本地文件保留，删除后会自动重建。
+- `data/companion.sqlite` 曾被误提交，已从版本库移除并加入 `.gitignore`；本地文件保留，删除后会自动重建。
 
 ---
 
