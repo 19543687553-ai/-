@@ -104,6 +104,10 @@ try {
         case 'adminWordSave':          lumi_action_admin_word_save(); break;
         case 'adminWordDelete':        lumi_action_admin_word_delete(); break;
         case 'adminTestSafety':        lumi_action_admin_test_safety(); break;
+        case 'adminSaveSafetyRemote':  lumi_action_admin_save_safety_remote(); break;
+        case 'adminTestSafetyRemote':  lumi_action_admin_test_safety_remote(); break;
+        case 'adminImportRemoteWords': lumi_action_admin_import_remote_words(); break;
+        case 'adminClearRemoteWords':  lumi_action_admin_clear_remote_words(); break;
         case 'adminFeedbacks':         lumi_action_admin_feedbacks(); break;
         case 'adminFeedbackReply':     lumi_action_admin_feedback_reply(); break;
         case 'adminAdmins':            lumi_action_admin_admins(); break;
@@ -575,6 +579,120 @@ function lumi_assert_safe(string $text, string $what = '内容'): void
     }
 }
 
+function lumi_safety_remote_url_allowed(string $url): bool
+{
+    $parts = parse_url($url);
+    if (!$parts || empty($parts['scheme']) || empty($parts['host'])) return false;
+    if (!in_array(strtolower($parts['scheme']), ['http', 'https'], true)) return false;
+    $host = strtolower($parts['host']);
+    if ($host === 'localhost' || substr($host, -6) === '.local') return false;
+    $ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : gethostbyname($host);
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) return false;
+    return (bool)filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+}
+
+function lumi_http_get(string $url, int $timeout = 6): array
+{
+    if (!lumi_safety_remote_url_allowed($url)) {
+        return ['ok' => false, 'error' => '接口地址不可访问或不是公开地址', 'code' => 0];
+    }
+    if (!function_exists('curl_init')) {
+        return ['ok' => false, 'error' => '服务器未安装 cURL 扩展', 'code' => 0];
+    }
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_MAXREDIRS => 0,
+        CURLOPT_CONNECTTIMEOUT => min(4, $timeout),
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_USERAGENT => 'Xinyu-Safety/1.0',
+        CURLOPT_HTTPHEADER => ['Accept: application/json, text/plain, */*'],
+    ]);
+    $proxy = getenv('HTTPS_PROXY') ?: (getenv('https_proxy') ?: (getenv('HTTP_PROXY') ?: getenv('http_proxy')));
+    if (is_string($proxy) && $proxy !== '') {
+        curl_setopt($ch, CURLOPT_PROXY, $proxy);
+    }
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    if ($body === false || $code < 200 || $code >= 300) {
+        return ['ok' => false, 'error' => $error !== '' ? $error : ('HTTP ' . $code), 'code' => $code];
+    }
+    if (strlen($body) > 2097152) {
+        return ['ok' => false, 'error' => '远程返回内容过大', 'code' => $code];
+    }
+    return ['ok' => true, 'body' => (string)$body, 'code' => $code, 'error' => ''];
+}
+
+function lumi_safety_remote_flag_scan($value, int $depth = 0): bool
+{
+    if ($depth > 4) return false;
+    if (is_bool($value)) return $value;
+    if (is_int($value)) return $value === 1;
+    if (is_string($value)) {
+        return in_array(strtolower(trim($value)), ['true', '1', 'yes', 'flagged', 'sensitive', 'block', 'review'], true);
+    }
+    if (!is_array($value)) return false;
+    foreach (['flagged', 'contains', 'sensitive', 'has_sensitive', 'is_sensitive', 'blocked', 'hit', 'result', 'data'] as $key) {
+        if (array_key_exists($key, $value)) {
+            return lumi_safety_remote_flag_scan($value[$key], $depth + 1);
+        }
+    }
+    foreach ($value as $item) {
+        if ((is_array($item) || is_string($item) || is_bool($item)) && lumi_safety_remote_flag_scan($item, $depth + 1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function lumi_safety_remote_parse_flag(string $body): bool
+{
+    $raw = trim($body);
+    if ($raw === '') return false;
+    $plain = strtolower($raw);
+    if (in_array($plain, ['true', '1', 'yes', 'flagged', 'sensitive', 'block', 'review'], true)) return true;
+    if (in_array($plain, ['false', '0', 'no', 'ok', 'pass', 'safe', 'clean'], true)) return false;
+    $json = json_decode($raw, true);
+    return is_array($json) ? lumi_safety_remote_flag_scan($json) : false;
+}
+
+function lumi_safety_remote_flagged(string $text, bool $force = false): array
+{
+    $enabled = $force || (int)lumi_setting('safety_remote_enabled', '0') === 1;
+    if (!$enabled) {
+        return ['flagged' => false, 'skipped' => true, 'reason' => 'disabled', 'latency_ms' => 0];
+    }
+    $provider = (string)lumi_setting('safety_remote_provider', 'purgomalum');
+    if (!in_array($provider, ['purgomalum', 'custom'], true)) $provider = 'purgomalum';
+    $text = trim($text);
+    if ($text === '') {
+        return ['flagged' => false, 'skipped' => true, 'reason' => 'empty', 'latency_ms' => 0];
+    }
+    if ($provider === 'purgomalum') {
+        if (!preg_match('/[A-Za-z]{2,}/', $text)) {
+            return ['flagged' => false, 'skipped' => true, 'reason' => 'no_latin', 'latency_ms' => 0, 'provider' => $provider];
+        }
+        $url = 'https://www.purgomalum.com/service/containsprofanity?text=' . rawurlencode(mb_substr($text, 0, 600));
+    } else {
+        $template = trim((string)lumi_setting('safety_remote_url', ''));
+        if ($template === '' || strpos($template, '{text}') === false) {
+            return ['flagged' => false, 'skipped' => false, 'error' => '自定义接口未配置 {text} 占位符', 'latency_ms' => 0, 'provider' => $provider];
+        }
+        $url = str_replace('{text}', rawurlencode(mb_substr($text, 0, 600)), $template);
+    }
+    $start = microtime(true);
+    $res = lumi_http_get($url, $force ? 8 : 4);
+    $latency = (int)round((microtime(true) - $start) * 1000);
+    if (!$res['ok']) {
+        return ['flagged' => false, 'skipped' => false, 'error' => (string)$res['error'], 'latency_ms' => $latency, 'provider' => $provider];
+    }
+    $flagged = lumi_safety_remote_parse_flag((string)$res['body']);
+    return ['flagged' => $flagged, 'skipped' => false, 'error' => '', 'latency_ms' => $latency, 'provider' => $provider];
+}
+
 function lumi_check_safety(string $text): array
 {
     if (!(int)lumi_setting('safety_enabled', '1')) {
@@ -594,7 +712,109 @@ function lumi_check_safety(string $text): array
             return ['allowed' => true, 'flagged' => true, 'matched' => $word, 'category' => $row['category']];
         }
     }
+    $remote = lumi_safety_remote_flagged($text);
+    if (!empty($remote['flagged'])) {
+        return ['allowed' => true, 'flagged' => true, 'matched' => '远程接口', 'category' => '远程检测', 'remote' => true];
+    }
     return ['allowed' => true, 'flagged' => false, 'matched' => ''];
+}
+
+function lumi_safety_word_presets(): array
+{
+    $base = 'https://raw.githubusercontent.com/Konsheng/Sensitive-lexicon/main/Vocabulary/';
+    return [
+        'ad' => [
+            'label' => '广告引流',
+            'url' => $base . '%E5%B9%BF%E5%91%8A%E7%B1%BB%E5%9E%8B.txt',
+            'category' => '广告',
+            'action' => 'review',
+        ],
+        'low' => [
+            'label' => '低俗内容',
+            'url' => $base . '%E8%89%B2%E6%83%85%E8%AF%8D%E5%BA%93.txt',
+            'category' => '低俗',
+            'action' => 'review',
+        ],
+        'violent' => [
+            'label' => '暴力内容',
+            'url' => $base . '%E6%9A%B4%E6%81%90%E8%AF%8D%E5%BA%93.txt',
+            'category' => '暴力',
+            'action' => 'review',
+        ],
+        'weapon' => [
+            'label' => '危险物品',
+            'url' => $base . '%E6%B6%89%E6%9E%AA%E6%B6%89%E7%82%B8.txt',
+            'category' => '危险物品',
+            'action' => 'review',
+        ],
+    ];
+}
+
+function lumi_safety_collect_words($value, int $depth = 0): array
+{
+    if ($depth > 4) return [];
+    if (is_string($value)) return [$value];
+    if (!is_array($value)) return [];
+    $allScalar = true;
+    foreach ($value as $item) {
+        if (!is_string($item) && !is_int($item)) {
+            $allScalar = false;
+            break;
+        }
+    }
+    if ($allScalar) {
+        $out = [];
+        foreach ($value as $item) {
+            $text = trim((string)$item);
+            if ($text !== '') $out[] = $text;
+        }
+        return $out;
+    }
+    foreach (['words', 'data', 'items', 'list', 'result'] as $key) {
+        if (isset($value[$key])) return lumi_safety_collect_words($value[$key], $depth + 1);
+    }
+    $out = [];
+    foreach ($value as $item) {
+        if (is_array($item)) {
+            foreach (lumi_safety_collect_words($item, $depth + 1) as $word) $out[] = $word;
+        }
+    }
+    return $out;
+}
+
+function lumi_safety_parse_wordlist(string $body): array
+{
+    $body = trim(preg_replace('/^\xEF\xBB\xBF/', '', $body));
+    if ($body === '') return [];
+    $json = json_decode($body, true);
+    if (is_array($json)) {
+        $words = lumi_safety_collect_words($json);
+        if ($words) return $words;
+    }
+    $lines = preg_split('/[\r\n,，;；]+/u', $body) ?: [];
+    $words = [];
+    foreach ($lines as $line) {
+        $line = trim((string)$line);
+        if ($line === '' || $line[0] === '#') continue;
+        $words[] = $line;
+    }
+    return $words;
+}
+
+function lumi_safety_words_from_remote(string $url): array
+{
+    $res = lumi_http_get($url, 8);
+    if (!$res['ok']) {
+        return ['ok' => false, 'error' => (string)$res['error'], 'words' => []];
+    }
+    $words = [];
+    foreach (lumi_safety_parse_wordlist((string)$res['body']) as $word) {
+        $word = trim(lumi_clean_text((string)$word, 60));
+        if ($word === '' || mb_strlen($word) > 60) continue;
+        $words[$word] = true;
+        if (count($words) >= 3000) break;
+    }
+    return ['ok' => true, 'error' => '', 'words' => array_keys($words)];
 }
 
 function lumi_chat_suggestions(string $primary, array $state): array
@@ -2304,7 +2524,22 @@ function lumi_action_admin_words(): void
 {
     lumi_require_admin();
     $rows = lumi_db()->query("SELECT * FROM sensitive_words ORDER BY id DESC")->fetchAll();
-    lumi_ok(['items' => $rows]);
+    foreach ($rows as &$row) {
+        if (empty($row['source'])) $row['source'] = 'manual';
+        $row['updated_at'] = (int)($row['updated_at'] ?? 0);
+        $row['created_at'] = (int)($row['created_at'] ?? 0);
+    }
+    unset($row);
+    lumi_ok([
+        'items' => $rows,
+        'presets' => lumi_safety_word_presets(),
+        'remote' => [
+            'enabled' => (string)lumi_setting('safety_remote_enabled', '0'),
+            'provider' => (string)lumi_setting('safety_remote_provider', 'purgomalum'),
+            'url' => (string)lumi_setting('safety_remote_url', ''),
+            'remote_words' => (int)lumi_db()->query("SELECT COUNT(*) FROM sensitive_words WHERE source='remote'")->fetchColumn(),
+        ],
+    ]);
 }
 
 function lumi_action_admin_word_save(): void
@@ -2339,6 +2574,88 @@ function lumi_action_admin_test_safety(): void
         'matched' => $result['matched'] ?? '',
         'normalized' => lumi_safety_normalize($text),
     ]);
+}
+
+function lumi_action_admin_save_safety_remote(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin']);
+    $enabled = (int)lumi_param('enabled', 0) === 1 ? '1' : '0';
+    $provider = (string)lumi_param('provider', 'purgomalum');
+    if (!in_array($provider, ['purgomalum', 'custom'], true)) {
+        lumi_err('不支持的接口类型');
+    }
+    $url = trim((string)lumi_param('url', ''));
+    if ($provider === 'custom') {
+        if ($url === '' || strpos($url, '{text}') === false) {
+            lumi_err('自定义接口地址需要包含 {text} 占位符');
+        }
+        if (!lumi_safety_remote_url_allowed($url)) {
+            lumi_err('接口地址必须是公开可访问的 HTTP(S) 地址');
+        }
+    }
+    lumi_set_setting('safety_remote_enabled', $enabled);
+    lumi_set_setting('safety_remote_provider', $provider);
+    lumi_set_setting('safety_remote_url', $url);
+    lumi_audit($admin, 'settings.update', 'safety', 'remote', '更新远程敏感词接口：' . $provider . ' / ' . ($enabled === '1' ? '开启' : '关闭'));
+    lumi_ok([], '远程接口设置已保存');
+}
+
+function lumi_action_admin_test_safety_remote(): void
+{
+    lumi_require_admin();
+    $text = trim((string)lumi_param('text', ''));
+    if ($text === '') lumi_err('请输入要测试的文本');
+    $res = lumi_safety_remote_flagged($text, true);
+    lumi_ok([
+        'flagged' => (bool)$res['flagged'],
+        'provider' => $res['provider'] ?? '',
+        'latency_ms' => (int)($res['latency_ms'] ?? 0),
+        'error' => $res['error'] ?? '',
+        'skipped' => !empty($res['skipped']),
+        'reason' => $res['reason'] ?? '',
+    ], !empty($res['error']) ? '接口请求失败' : (!empty($res['flagged']) ? '远程接口判定需要复核' : '远程接口未命中'));
+}
+
+function lumi_action_admin_import_remote_words(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin']);
+    $presets = lumi_safety_word_presets();
+    $preset = (string)lumi_param('preset', '');
+    $url = trim((string)lumi_param('url', ''));
+    $category = '远程词库';
+    if (isset($presets[$preset])) {
+        $url = $presets[$preset]['url'];
+        $category = $presets[$preset]['category'];
+    }
+    if ($url === '') lumi_err('请选择词库分类或填写词库地址');
+    if (!lumi_safety_remote_url_allowed($url)) lumi_err('词库地址必须是公开可访问的 HTTP(S) 地址');
+    $remote = lumi_safety_words_from_remote($url);
+    if (!$remote['ok']) lumi_err('词库拉取失败：' . $remote['error']);
+    if (!$remote['words']) lumi_err('远程词库没有可导入的词条');
+    $st = lumi_db()->prepare("INSERT OR IGNORE INTO sensitive_words (word, action, category, source, created_at, updated_at) VALUES (?, 'review', ?, 'remote', ?, ?)");
+    $now = time();
+    $added = 0;
+    foreach ($remote['words'] as $word) {
+        $st->execute([$word, $category, $now, $now]);
+        $added += $st->rowCount();
+    }
+    $total = count($remote['words']);
+    lumi_audit($admin, 'word.import', 'safety', $preset !== '' ? $preset : 'custom', '导入远程词库：新增 ' . $added . ' / 共 ' . $total);
+    lumi_ok([
+        'added' => $added,
+        'total' => $total,
+        'skipped' => max(0, $total - $added),
+        'category' => $category,
+    ], '已导入 ' . $added . ' 条词，跳过重复 ' . max(0, $total - $added) . ' 条');
+}
+
+function lumi_action_admin_clear_remote_words(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin']);
+    $count = (int)lumi_db()->query("SELECT COUNT(*) FROM sensitive_words WHERE source='remote'")->fetchColumn();
+    lumi_db()->exec("DELETE FROM sensitive_words WHERE source='remote'");
+    lumi_audit($admin, 'word.delete', 'safety', 'remote', '清空远程词库：' . $count . ' 条');
+    lumi_ok(['deleted' => $count], '已清空 ' . $count . ' 条远程词');
 }
 
 function lumi_action_admin_word_delete(): void

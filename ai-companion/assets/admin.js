@@ -24,7 +24,7 @@
     'message.delete': '删除消息', 'message.pin': '精选消息', 'message.send': '发送人工消息',
     'settings.update': '更新系统设置', 'model.save': '更新模型配置',
     'announcement.create': '发布公告', 'announcement.update': '修改公告', 'announcement.delete': '删除公告',
-    'word.create': '新增敏感词', 'word.delete': '删除敏感词',
+    'word.create': '新增敏感词', 'word.delete': '删除敏感词', 'word.import': '导入远程词库',
     'feedback.reply': '回复反馈', 'broadcast.send': '全站关怀',
     'system.backup': '下载备份', 'system.export_users': '导出用户'
   };
@@ -1190,6 +1190,8 @@
   async function renderWords(box) {
     const data = await api('adminWords');
     const items = data.items || [];
+    const remote = data.remote || {};
+    const presets = data.presets || {};
     box.innerHTML = `
       <div class="section-grid">
         <div class="panel">
@@ -1224,22 +1226,148 @@
           </div>
           <div class="table-scroll">
             <table class="data-table">
-              <thead><tr><th>词条</th><th>处理</th><th>分类</th><th>添加时间</th><th>操作</th></tr></thead>
+              <thead><tr><th>词条</th><th>处理</th><th>分类</th><th>来源</th><th>添加时间</th><th>操作</th></tr></thead>
               <tbody>
                 ${items.map((w) => `
                   <tr>
                     <td class="cell-main">${esc(w.word)}</td>
                     <td><span class="badge ${w.action === 'block' ? 'danger' : 'warn'}">${esc(WORD_ACTION[w.action] || w.action)}</span></td>
                     <td>${esc(w.category || '通用')}</td>
+                    <td>${w.source === 'remote' ? '<span class="badge info">远程</span>' : '<span class="badge">手动</span>'}</td>
                     <td class="cell-sub">${UI.formatDateTime(w.created_at)}</td>
                     <td><button class="mini-btn danger" data-act="word-del" data-id="${w.id}">${UI.icon('trash', 13)}删除</button></td>
-                  </tr>`).join('') || '<tr><td colspan="5">' + emptyHTML('词库还是空的', '添加需要拦截的词，保护对话边界') + '</td></tr>'}
+                  </tr>`).join('') || '<tr><td colspan="6">' + emptyHTML('词库还是空的', '添加需要拦截的词，或从远程接口导入') + '</td></tr>'}
               </tbody>
             </table>
           </div>
         </div>
+      </div>
+      <div class="section-grid" style="margin-top:18px">
+        <div class="panel">
+          <div class="panel-head"><div><h2>远程敏感词接口</h2><p>免注册、免 Key，命中后只标记复核，不直接拦截</p></div><span class="badge ok">无需 Key</span></div>
+          <div class="panel-body">
+            <div class="form-grid">
+              <label class="field"><span class="field-label">远程检测</span>
+                <select id="safetyRemoteEnabled">
+                  <option value="1" ${remote.enabled === '1' ? 'selected' : ''}>开启</option>
+                  <option value="0" ${remote.enabled !== '1' ? 'selected' : ''}>关闭</option>
+                </select></label>
+              <label class="field"><span class="field-label">接口类型</span>
+                <select id="safetyRemoteProvider">
+                  <option value="purgomalum" ${remote.provider === 'purgomalum' ? 'selected' : ''}>英文脏话检测 · PurgoMalum</option>
+                  <option value="custom" ${remote.provider === 'custom' ? 'selected' : ''}>自定义接口</option>
+                </select></label>
+              <label class="field span-2"><span class="field-label">自定义接口地址</span>
+                <input class="input" id="safetyRemoteUrl" maxlength="500" value="${esc(remote.url || '')}" placeholder="https://example.com/check?text={text}"></label>
+              <label class="field"><span class="field-label">测试文本</span>
+                <input class="input" id="safetyRemoteTestText" maxlength="200" placeholder="输入一段文本测试接口"></label>
+              <div class="field" style="justify-content:flex-end"><span class="field-label">　</span>
+                <button class="btn btn-ghost" type="button" id="safetyRemoteTestBtn">${UI.icon('shield', 15)}测试接口</button></div>
+            </div>
+            <p class="cell-sub" id="safetyRemoteResult" style="margin-top:10px">PurgoMalum 无需注册和 Key；自定义接口需返回 true/false 或含 flagged 字段。</p>
+            <div class="panel-actions" style="margin-top:14px"><button class="btn btn-primary" type="button" id="safetyRemoteSave">保存接口设置</button></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><h2>远程词库导入</h2><p>支持 TXT / JSON，导入词默认标记复核</p></div><span class="badge info">远程 ${remote.remote_words || 0} 条</span></div>
+          <div class="panel-body">
+            <div class="form-grid">
+              <label class="field"><span class="field-label">词库分类</span>
+                <select id="wordImportPreset">
+                  <option value="">请选择分类</option>
+                  ${Object.keys(presets).map((key) => `<option value="${esc(key)}">${esc(presets[key].label)}</option>`).join('')}
+                  <option value="custom">自定义地址</option>
+                </select></label>
+              <label class="field span-2"><span class="field-label">词库地址</span>
+                <input class="input" id="wordImportUrl" maxlength="500" placeholder="https://.../words.txt 或 words.json"></label>
+            </div>
+            <p class="cell-sub" id="wordImportResult" style="margin-top:10px">内置源来自公开中文词库，免注册、免 Key；导入不会覆盖已有手动规则。</p>
+            <div class="panel-actions" style="margin-top:14px">
+              <button class="btn btn-primary" type="button" id="wordImportBtn">${UI.icon('download', 15)}导入远程词库</button>
+              <button class="btn btn-ghost" type="button" id="wordClearBtn">${UI.icon('trash', 15)}清空远程词</button>
+            </div>
+          </div>
+        </div>
       </div>`;
     mountIcons(box);
+    const remoteProvider = $('#safetyRemoteProvider');
+    const remoteUrl = $('#safetyRemoteUrl');
+    const toggleRemoteUrl = () => { remoteUrl.disabled = remoteProvider.value !== 'custom'; };
+    remoteProvider.addEventListener('change', toggleRemoteUrl);
+    toggleRemoteUrl();
+    $('#wordImportPreset').addEventListener('change', (event) => {
+      const key = event.target.value;
+      $('#wordImportUrl').value = key && presets[key] ? presets[key].url : '';
+    });
+    $('#safetyRemoteSave').addEventListener('click', async () => {
+      try {
+        await api('adminSaveSafetyRemote', {
+          enabled: Number($('#safetyRemoteEnabled').value),
+          provider: remoteProvider.value,
+          url: remoteUrl.value.trim()
+        });
+        UI.toast('远程接口设置已保存', 'success');
+        loadView('words');
+      } catch (err) {
+        UI.toast(err.message || '保存失败', 'error');
+      }
+    });
+    $('#safetyRemoteTestBtn').addEventListener('click', async () => {
+      const text = $('#safetyRemoteTestText').value.trim();
+      if (!text) {
+        UI.toast('请输入要测试的文本', 'warn');
+        return;
+      }
+      const boxEl = $('#safetyRemoteResult');
+      boxEl.textContent = '正在请求远程接口…';
+      try {
+        const data = await api('adminTestSafetyRemote', { text });
+        const state = data.error
+          ? '<span class="badge danger">请求失败</span> ' + esc(data.error)
+          : data.flagged
+            ? '<span class="badge warn">需要复核</span> 远程接口命中'
+            : '<span class="badge ok">未命中</span> 远程接口未命中';
+        boxEl.innerHTML = state + ' · ' + Number(data.latency_ms || 0) + 'ms';
+      } catch (err) {
+        boxEl.innerHTML = '<span class="badge danger">请求失败</span> ' + esc(err.message || '');
+      }
+    });
+    $('#wordImportBtn').addEventListener('click', async () => {
+      const preset = $('#wordImportPreset').value;
+      const url = $('#wordImportUrl').value.trim();
+      if (preset === 'custom' && !url) {
+        UI.toast('请填写自定义词库地址', 'warn');
+        return;
+      }
+      if (!preset) {
+        UI.toast('请选择词库分类', 'warn');
+        return;
+      }
+      const boxEl = $('#wordImportResult');
+      boxEl.textContent = '正在拉取远程词库…';
+      try {
+        const data = await api('adminImportRemoteWords', { preset, url });
+        UI.toast(`已导入 ${data.added} 条，跳过重复 ${data.skipped} 条`, 'success');
+        loadView('words');
+      } catch (err) {
+        boxEl.innerHTML = '<span class="badge danger">导入失败</span> ' + esc(err.message || '');
+      }
+    });
+    $('#wordClearBtn').addEventListener('click', async () => {
+      const ok = await confirmDialog({
+        title: '清空远程词',
+        message: '只会删除来源为「远程」的词条，手动添加的规则不受影响。',
+        confirmText: '确认清空'
+      });
+      if (!ok) return;
+      try {
+        const data = await api('adminClearRemoteWords');
+        UI.toast(`已清空 ${data.deleted} 条远程词`, 'success');
+        loadView('words');
+      } catch (err) {
+        UI.toast(err.message || '操作失败', 'error');
+      }
+    });
     $('#wordForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const word = $('#wordText').value.trim();

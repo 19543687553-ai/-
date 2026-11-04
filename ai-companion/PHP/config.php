@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '2.1.0';
+const LUMI_VERSION = '2.2.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -328,6 +328,17 @@ function lumi_migrate_db(PDO $pdo): void
     if (!isset($columns['starts_at'])) {
         $pdo->exec("ALTER TABLE announcements ADD COLUMN starts_at INTEGER DEFAULT 0");
     }
+
+    $wordColumns = [];
+    foreach ($pdo->query("PRAGMA table_info(sensitive_words)")->fetchAll() as $row) {
+        $wordColumns[(string)$row['name']] = true;
+    }
+    if (!isset($wordColumns['source'])) {
+        $pdo->exec("ALTER TABLE sensitive_words ADD COLUMN source TEXT DEFAULT 'manual'");
+    }
+    if (!isset($wordColumns['updated_at'])) {
+        $pdo->exec("ALTER TABLE sensitive_words ADD COLUMN updated_at INTEGER DEFAULT 0");
+    }
 }
 
 function lumi_default_settings(): array
@@ -351,6 +362,9 @@ function lumi_default_settings(): array
         'proactive_probability' => '0.55',
         'max_context_messages' => '18',
         'safety_enabled' => '1',
+        'safety_remote_enabled' => '0',
+        'safety_remote_provider' => 'purgomalum',
+        'safety_remote_url' => '',
         'maintenance_mode' => '0',
         'maintenance_notice' => '心屿正在做一点小小的整理，很快就回来。',
         'maintenance_reason' => '例行的维护与升级',
@@ -459,11 +473,6 @@ function lumi_seed(PDO $pdo): void
     $pdo->prepare("INSERT INTO feedbacks (user_id, category, content, contact, status, reply, created_at, replied_at, replied_by) VALUES (?, '情感', '晚上情绪会很低，有没有夜间陪伴？', 'demo@example.com', 'replied', '有的，把主动陪伴打开，深夜也会有人轻轻问你一句。', ?, ?, '屿主理人')")->execute([$demoId, $now - 86400 * 3, $now - 86400 * 2]);
 
     $pdo->prepare("INSERT INTO announcements (title, content, level, active, expires_at, created_by, created_at) VALUES ('今晚，留一点时间给自己', '小屿会在你回来的时候，轻轻问你一句：今天过得怎么样？', 'warm', 1, 0, '屿主理人', ?)")->execute([$now - 3600]);
-
-    $word = $pdo->prepare("INSERT OR IGNORE INTO sensitive_words (word, action, category, created_at) VALUES (?, ?, ?, ?)");
-    foreach ([['代开发票', 'block', '广告'], ['加微信返利', 'block', '广告'], ['自杀', 'review', '风险']] as $item) {
-        $word->execute([$item[0], $item[1], $item[2], $now]);
-    }
 }
 
 function lumi_setting(string $key, $default = null)
