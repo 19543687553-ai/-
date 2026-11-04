@@ -110,6 +110,7 @@ try {
         case 'adminBackup':            lumi_action_admin_backup(); break;
         case 'adminExportUsers':       lumi_action_admin_export_users(); break;
         case 'adminSystemInfo':        lumi_action_admin_system_info(); break;
+        case 'adminOptimizeDb':        lumi_action_admin_optimize_db(); break;
 
         default:
             lumi_err('无效的接口操作', 404);
@@ -2468,4 +2469,36 @@ function lumi_action_admin_system_info(): void
         'sessions' => (int)$pdo->query("SELECT COUNT(*) FROM user_sessions WHERE expires_at>" . time())->fetchColumn(),
         'admin_sessions' => (int)$pdo->query("SELECT COUNT(*) FROM admin_sessions WHERE expires_at>" . time())->fetchColumn(),
     ]);
+}
+
+function lumi_action_admin_optimize_db(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin']);
+    $pdo = lumi_db();
+    $now = time();
+
+    $rate = $pdo->prepare("DELETE FROM rate_limits WHERE window_start < ?");
+    $rate->execute([$now - 90000]);
+    $cleanedRate = $rate->rowCount();
+
+    $userSessions = $pdo->prepare("DELETE FROM user_sessions WHERE expires_at < ?");
+    $userSessions->execute([$now]);
+    $cleanedUserSessions = $userSessions->rowCount();
+
+    $adminSessions = $pdo->prepare("DELETE FROM admin_sessions WHERE expires_at < ?");
+    $adminSessions->execute([$now]);
+    $cleanedAdminSessions = $adminSessions->rowCount();
+
+    $pdo->query('PRAGMA optimize')->fetchAll();
+    $integrity = (string)$pdo->query('PRAGMA quick_check')->fetchColumn();
+    $dbFile = lumi_data_dir() . '/' . LUMI_DB_FILE;
+
+    lumi_audit($admin, 'system.optimize', 'system', 'db', '执行数据库体检与优化');
+    lumi_ok([
+        'cleaned_rate_limits' => $cleanedRate,
+        'cleaned_sessions' => $cleanedUserSessions,
+        'cleaned_admin_sessions' => $cleanedAdminSessions,
+        'integrity' => $integrity,
+        'db_size' => is_file($dbFile) ? filesize($dbFile) : 0,
+    ], '数据库体检完成');
 }

@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '2.0.0';
+const LUMI_VERSION = '2.0.1';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -304,6 +304,8 @@ function lumi_init_db(PDO $pdo): void
 
     CREATE INDEX IF NOT EXISTS idx_messages_user_created ON messages(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id);
+    CREATE INDEX IF NOT EXISTS idx_feedbacks_status ON feedbacks(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_mood_logs_user_created ON mood_logs(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_checkins_user_created ON checkins(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_journals_user_day ON journals(user_id, day);
@@ -740,8 +742,9 @@ function lumi_rate_limit(string $key, int $max, int $window): void
 {
     $pdo = lumi_db();
     $now = time();
-    if (random_int(1, 50) === 1) {
-        $pdo->prepare("DELETE FROM rate_limits WHERE window_start < ?")->execute([$now - 3600]);
+    if (random_int(1, 30) === 1) {
+        // 仅清理超过 25 小时的旧桶，避免误删 24 小时窗口（签到/反馈）的限流记录
+        $pdo->prepare("DELETE FROM rate_limits WHERE window_start < ?")->execute([$now - 90000]);
     }
     $bucket = $key . ':' . intdiv($now, $window);
     $st = $pdo->prepare("SELECT count FROM rate_limits WHERE key = ?");
@@ -752,6 +755,7 @@ function lumi_rate_limit(string $key, int $max, int $window): void
         return;
     }
     if ((int)$count >= $max) {
+        header('Retry-After: ' . max(1, $window - ($now % $window)));
         lumi_err('操作有点频繁，请稍后再试', 429);
     }
     $pdo->prepare("UPDATE rate_limits SET count = count + 1 WHERE key = ?")->execute([$bucket]);

@@ -1500,6 +1500,12 @@
             <p>以陪伴者身份向所有正常用户发送一条主动消息，会写入各自的聊天记录。</p>
             <button class="btn btn-ghost btn-block btn-sm" data-act="broadcast">${UI.icon('heart', 14)}发送关怀</button>
           </div>
+          <div class="tool-card">
+            <span class="tool-icon">${UI.icon('shield', 19)}</span>
+            <h3>数据库体检</h3>
+            <p>清理过期会话与限流记录，执行 SQLite 完整性检查与查询优化。</p>
+            <button class="btn btn-ghost btn-block btn-sm" data-act="db-optimize">${UI.icon('pulse', 14)}开始体检</button>
+          </div>
         </div>
         <div class="grid-2-1">
           <div class="panel">
@@ -1544,6 +1550,33 @@
     } catch (err) {
       const box = $('#sysInfoBox');
       if (box) box.innerHTML = '<div class="notice warn">' + UI.icon('alert', 15) + '<span>' + esc(err.message) + '</span></div>';
+    }
+  }
+
+  async function optimizeDb() {
+    const btn = $('[data-act="db-optimize"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '体检中…';
+    }
+    try {
+      const result = await api('adminOptimizeDb');
+      const cleaned = (result.cleaned_rate_limits || 0) + (result.cleaned_sessions || 0) + (result.cleaned_admin_sessions || 0);
+      await loadSystemInfo();
+      const box = $('#sysInfoBox');
+      if (box) {
+        box.insertAdjacentHTML('afterbegin', `<div class="notice">${UI.icon('check', 15)}<span>完整性检查：${esc(result.integrity)} · 已清理 ${cleaned} 条过期记录</span></div>`);
+        mountIcons(box);
+      }
+      UI.toast('数据库体检完成', 'success');
+    } catch (err) {
+      UI.toast(err.message || '体检失败', 'error');
+    } finally {
+      if (btn && btn.isConnected) {
+        btn.disabled = false;
+        btn.innerHTML = UI.icon('pulse', 14) + '开始体检';
+        mountIcons(btn);
+      }
     }
   }
 
@@ -2233,6 +2266,7 @@
       case 'export-users': window.location.href = LumiAPI.downloadUrl('adminExportUsers', 'admin'); break;
       case 'broadcast': broadcastModal(); break;
       case 'sysinfo': loadSystemInfo(); break;
+      case 'db-optimize': optimizeDb(); break;
       case 'clear-key': clearModelKey(); break;
       default: break;
     }
