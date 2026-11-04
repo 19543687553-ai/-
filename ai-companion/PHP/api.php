@@ -98,6 +98,7 @@ try {
         case 'adminWords':             lumi_action_admin_words(); break;
         case 'adminWordSave':          lumi_action_admin_word_save(); break;
         case 'adminWordDelete':        lumi_action_admin_word_delete(); break;
+        case 'adminTestSafety':        lumi_action_admin_test_safety(); break;
         case 'adminFeedbacks':         lumi_action_admin_feedbacks(); break;
         case 'adminFeedbackReply':     lumi_action_admin_feedback_reply(); break;
         case 'adminAdmins':            lumi_action_admin_admins(); break;
@@ -225,6 +226,8 @@ function lumi_action_register(): void
     if ($nickname === '') {
         $nickname = $username;
     }
+    lumi_assert_safe($username, '用户名');
+    lumi_assert_safe($nickname, '昵称');
 
     $pdo = lumi_db();
     $st = $pdo->prepare("SELECT id FROM users WHERE username=? LIMIT 1");
@@ -372,19 +375,23 @@ function lumi_action_update_profile(): void
 
     $nickname = lumi_clean_text((string)lumi_param('nickname', $user['nickname']), 20);
     if ($nickname === '') lumi_err('昵称不能为空');
+    lumi_assert_safe($nickname, '昵称');
     $fields[] = 'nickname=?';
     $params[] = $nickname;
 
     $companion = lumi_clean_text((string)lumi_param('companion_name', $user['companion_name']), 12);
     if ($companion === '') lumi_err('陪伴者名字不能为空');
+    lumi_assert_safe($companion, '陪伴者名字');
     $fields[] = 'companion_name=?';
     $params[] = $companion;
 
     $persona = lumi_clean_text((string)lumi_param('companion_persona', $user['companion_persona']), 200);
+    lumi_assert_safe($persona, '人格设定');
     $fields[] = 'companion_persona=?';
     $params[] = $persona;
 
     $bio = lumi_clean_text((string)lumi_param('bio', $user['bio']), 200);
+    lumi_assert_safe($bio, '简介');
     $fields[] = 'bio=?';
     $params[] = $bio;
 
@@ -502,6 +509,17 @@ function lumi_safety_normalize(string $text): string
     $text = preg_replace('/[\p{Z}\s\x{200B}-\x{200F}\x{202A}-\x{202E}\x{FEFF}]+/u', '', $text) ?? $text;
     $text = preg_replace('/[\p{P}\p{S}]+/u', '', $text) ?? $text;
     return $text;
+}
+
+function lumi_assert_safe(string $text, string $what = '内容'): void
+{
+    if ($text === '') return;
+    $result = lumi_check_safety($text);
+    if (!$result['allowed']) {
+        lumi_err('这段' . $what . '里有不适合出现的内容，换个说法再试好吗', 422, [
+            'flagged' => true,
+        ]);
+    }
 }
 
 function lumi_check_safety(string $text): array
@@ -1190,6 +1208,7 @@ function lumi_action_checkin(): void
         lumi_err('先选一个今天的心情吧');
     }
     $note = lumi_clean_text((string)lumi_param('note', ''), 120);
+    lumi_assert_safe($note, '签到备注');
     lumi_rate_limit('checkin:' . (int)$user['id'], 8, 86400);
 
     $user = lumi_mood_decay($user);
@@ -1311,6 +1330,7 @@ function lumi_action_feedback_create(): void
     $user = lumi_require_user();
     $content = lumi_clean_text((string)lumi_param('content', ''), 1000);
     if (mb_strlen($content) < 5) lumi_err('再多写一点吧，至少 5 个字');
+    lumi_assert_safe($content, '反馈内容');
     $category = (string)lumi_param('category', '建议');
     if (!in_array($category, ['建议', '问题', '情感', '其他'], true)) $category = '其他';
     $contact = lumi_clean_text((string)lumi_param('contact', ''), 100);
@@ -2147,6 +2167,22 @@ function lumi_action_admin_word_save(): void
     }
     lumi_audit($admin, 'word.create', 'word', '', $word . ' / ' . $action);
     lumi_ok([], '敏感词已添加');
+}
+
+function lumi_action_admin_test_safety(): void
+{
+    lumi_require_admin();
+    $text = lumi_clean_text((string)lumi_param('text', ''), 600);
+    if ($text === '') {
+        lumi_err('请输入要测试的文本');
+    }
+    $result = lumi_check_safety($text);
+    lumi_ok([
+        'allowed' => $result['allowed'],
+        'flagged' => $result['flagged'],
+        'matched' => $result['matched'] ?? '',
+        'normalized' => lumi_safety_normalize($text),
+    ]);
 }
 
 function lumi_action_admin_word_delete(): void

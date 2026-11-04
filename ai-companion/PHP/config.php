@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '1.7.0';
+const LUMI_VERSION = '1.8.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string

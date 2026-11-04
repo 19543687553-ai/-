@@ -916,6 +916,7 @@
     const s = data.settings;
     box.innerHTML = `
       <form id="settingsForm" class="section-grid">
+        ${s.maintenance_mode === '1' ? `<div class="notice warn">${UI.icon('clock', 15)}<span>维护模式已开启：登录、注册、聊天和轮询都会实时被全屏维护页拦截。${Number(s.maintenance_until || 0) > 0 ? '预计 ' + UI.formatDateTime(Number(s.maintenance_until)) + ' 恢复。' : ''}</span></div>` : ''}
         <div class="grid-2">
           <div class="panel">
             <div class="panel-head"><div><h2>基础信息</h2><p>展示在前台的名称与文案</p></div></div>
@@ -944,7 +945,7 @@
               <div class="section-grid">
                 ${switchRow('allowRegister', '开放注册', '关闭后新用户无法注册', s.allow_register === '1')}
                 ${switchRow('safetyEnabled', '安全过滤', '启用敏感词拦截与复核', s.safety_enabled === '1')}
-                ${switchRow('maintenanceMode', '维护模式', '前台显示维护提示，暂停用户登录与聊天', s.maintenance_mode === '1')}
+                ${switchRow('maintenanceMode', '维护模式', '开启后登录、注册、聊天、轮询实时显示全屏维护页', s.maintenance_mode === '1')}
                 <label class="field span-2"><span class="field-label">维护公告文案</span>
                   <textarea id="setMaintenanceNotice" style="min-height:70px" placeholder="维护时前台维护页会展示这句话">${esc(s.maintenance_notice || '')}</textarea></label>
                 <label class="field"><span class="field-label">维护原因（前台展示）</span>
@@ -1144,6 +1145,14 @@
               <div class="field" style="justify-content:flex-end"><span class="field-label">　</span>
                 <button class="btn btn-primary" type="submit" style="min-height:48px">${UI.icon('plus', 15)}添加规则</button></div>
             </form>
+            <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)">
+              <span class="field-label">拦截测试</span>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <input class="input" id="wordTestInput" maxlength="600" placeholder="粘贴一段话，测试空格或标点会不会绕过">
+                <button class="mini-btn" id="wordTestBtn" type="button">${UI.icon('shield', 13)}测试</button>
+              </div>
+              <p class="cell-sub" id="wordTestResult" style="margin-top:8px">输入文本后点击测试，规则会即时生效。</p>
+            </div>
           </div>
         </div>
         <div class="panel">
@@ -1180,9 +1189,21 @@
         UI.toast(err.message || '添加失败', 'error');
       }
     });
+    $('#wordTestBtn').addEventListener('click', async () => {
+      const text = $('#wordTestInput').value.trim();
+      if (!text) { UI.toast('先输入要测试的文本'); return; }
+      try {
+        const data = await api('adminTestSafety', { text: text });
+        const result = $('#wordTestResult');
+        const matched = data.matched ? '命中「' + esc(data.matched) + '」' : '未命中任何规则';
+        result.innerHTML = data.allowed
+          ? '<span class="badge ok">通过</span> ' + matched + '（复核规则只标记不拦截）'
+          : '<span class="badge danger">会被拦截</span> ' + matched;
+      } catch (err) {
+        UI.toast(err.message || '测试失败', 'error');
+      }
+    });
   }
-
-  // ---------------- 反馈 ----------------
   async function renderFeedbacks(box) {
     const f = state.filters.feedbacks;
     const data = await api('adminFeedbacks', { status: f.status, page: f.page });
