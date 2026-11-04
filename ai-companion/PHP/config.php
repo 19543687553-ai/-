@@ -27,7 +27,7 @@ if (PHP_SAPI !== 'cli') {
     }
 }
 
-const LUMI_VERSION = '2.3.0';
+const LUMI_VERSION = '2.4.0';
 const LUMI_DB_FILE = 'companion.sqlite';
 
 function lumi_data_dir(): string
@@ -281,6 +281,7 @@ function lumi_init_db(PDO $pdo): void
         word TEXT UNIQUE NOT NULL,
         action TEXT DEFAULT 'review',
         category TEXT DEFAULT '通用',
+        enabled INTEGER DEFAULT 1,
         created_at INTEGER NOT NULL
     );
 
@@ -350,6 +351,9 @@ function lumi_migrate_db(PDO $pdo): void
     }
     if (!isset($wordColumns['updated_at'])) {
         $pdo->exec("ALTER TABLE sensitive_words ADD COLUMN updated_at INTEGER DEFAULT 0");
+    }
+    if (!isset($wordColumns['enabled'])) {
+        $pdo->exec("ALTER TABLE sensitive_words ADD COLUMN enabled INTEGER DEFAULT 1");
     }
 }
 

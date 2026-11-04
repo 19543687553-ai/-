@@ -24,7 +24,7 @@
     'message.delete': '删除消息', 'message.pin': '精选消息', 'message.send': '发送人工消息',
     'settings.update': '更新系统设置', 'model.save': '更新模型配置',
     'announcement.create': '发布公告', 'announcement.update': '修改公告', 'announcement.delete': '删除公告',
-    'word.create': '新增敏感词', 'word.delete': '删除敏感词', 'word.import': '导入远程词库', 'word.bulk_import': '批量导入词库', 'safety.clear_hits': '清理命中记录',
+    'word.create': '新增敏感词', 'word.delete': '删除敏感词', 'word.toggle': '启停敏感词', 'word.import': '导入远程词库', 'word.bulk_import': '批量导入词库', 'safety.clear_hits': '清理命中记录', 'safety.export_hits': '导出命中记录',
     'feedback.reply': '回复反馈', 'broadcast.send': '全站关怀',
     'system.backup': '下载备份', 'system.export_users': '导出用户'
   };
@@ -57,6 +57,7 @@
       feedbacks: { status: 'all', page: 1 },
       audit: { q: '', page: 1 }
     },
+    hits: { scene: '', source: '', page: 1 },
     modelSettings: null
   };
 
@@ -1188,13 +1189,21 @@
 
   // ---------------- 敏感词 ----------------
   async function renderWords(box) {
-    const [data, hitData] = await Promise.all([api('adminWords'), api('adminSafetyHits')]);
+    const hf = state.hits;
+    const [data, hitData] = await Promise.all([api('adminWords'), api('adminSafetyHits', hf)]);
     const items = data.items || [];
     const remote = data.remote || {};
     const presets = data.presets || {};
     const hitItems = (hitData && hitData.items) || [];
     const summary = (hitData && hitData.summary) || {};
     const topWords = (hitData && hitData.top) || [];
+    const hitScenes = (hitData && hitData.scenes) || [];
+    if (hf.page > (hitData.pages || 1)) {
+      hf.page = hitData.pages || 1;
+      return loadView('words');
+    }
+    const sceneOptions = Array.from(new Set(['聊天', '用户名', '昵称', '陪伴者名字', '人格设定', '简介', '签到备注', '反馈内容']
+      .concat(hitScenes.map((s) => s.scene).filter(Boolean))));
     box.innerHTML = `
       <div class="section-grid">
         <div class="panel">
@@ -1229,7 +1238,7 @@
           </div>
           <div class="table-scroll">
             <table class="data-table">
-              <thead><tr><th>词条</th><th>处理</th><th>分类</th><th>来源</th><th>添加时间</th><th>操作</th></tr></thead>
+              <thead><tr><th>词条</th><th>处理</th><th>分类</th><th>来源</th><th>状态</th><th>添加时间</th><th>操作</th></tr></thead>
               <tbody>
                 ${items.map((w) => `
                   <tr>
@@ -1237,9 +1246,13 @@
                     <td><span class="badge ${w.action === 'block' ? 'danger' : 'warn'}">${esc(WORD_ACTION[w.action] || w.action)}</span></td>
                     <td>${esc(w.category || '通用')}</td>
                     <td>${w.source === 'remote' ? '<span class="badge info">远程</span>' : '<span class="badge">手动</span>'}</td>
+                    <td>${w.enabled === 0 ? '<span class="badge">已停用</span>' : '<span class="badge ok">启用中</span>'}</td>
                     <td class="cell-sub">${UI.formatDateTime(w.created_at)}</td>
-                    <td><button class="mini-btn danger" data-act="word-del" data-id="${w.id}">${UI.icon('trash', 13)}删除</button></td>
-                  </tr>`).join('') || '<tr><td colspan="6">' + emptyHTML('词库还是空的', '添加需要拦截的词，或从远程接口导入') + '</td></tr>'}
+                    <td><div class="panel-actions" style="justify-content:flex-end">
+                      <button class="mini-btn" data-word-toggle="${w.id}" data-enabled="${w.enabled === 0 ? 1 : 0}">${w.enabled === 0 ? '启用' : '停用'}</button>
+                      <button class="mini-btn danger" data-act="word-del" data-id="${w.id}">${UI.icon('trash', 13)}删除</button>
+                    </div></td>
+                  </tr>`).join('') || '<tr><td colspan="7">' + emptyHTML('词库还是空的', '添加需要拦截的词，或从远程接口导入') + '</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -1308,6 +1321,20 @@
         <div class="panel">
           <div class="panel-head"><div><h2>命中记录</h2><p>近 7 天安全词命中与场景分布</p></div><span class="badge warn">今日 ${Number(summary.today || 0)}</span></div>
           <div class="panel-body">
+            <div class="panel-actions" style="margin-bottom:12px;flex-wrap:wrap">
+              <select id="hitsScene" style="max-width:150px">
+                <option value="">全部场景</option>
+                ${sceneOptions.map((s) => `<option value="${esc(s)}" ${hf.scene === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+              </select>
+              <select id="hitsSource" style="max-width:130px">
+                <option value="">全部来源</option>
+                <option value="local" ${hf.source === 'local' ? 'selected' : ''}>本地</option>
+                <option value="remote" ${hf.source === 'remote' ? 'selected' : ''}>远程</option>
+              </select>
+              <button class="mini-btn" type="button" id="hitsExport">${UI.icon('download', 13)}导出命中</button>
+              <span class="spacer"></span>
+              <span class="cell-sub">共 ${Number(hitData.total || 0)} 条</span>
+            </div>
             <div class="panel-actions" style="margin-bottom:12px">
               <span class="badge info">近 7 天 ${Number(summary.week || 0)}</span>
               <span class="badge danger">拦截 ${Number(summary.blocked || 0)}</span>
@@ -1330,11 +1357,69 @@
                 </tbody>
               </table>
             </div>
-            <div class="panel-actions" style="margin-top:12px"><button class="btn btn-ghost" type="button" id="safetyHitsClear">${UI.icon('trash', 15)}清理 7 天前</button></div>
+            <div class="panel-actions" style="margin-top:12px;flex-wrap:wrap">
+              <button class="mini-btn" type="button" id="hitsPrev" ${Number(hitData.page || 1) <= 1 ? 'disabled' : ''}>上一页</button>
+              <span class="cell-sub">第 ${Number(hitData.page || 1)} / ${Number(hitData.pages || 1)} 页</span>
+              <button class="mini-btn" type="button" id="hitsNext" ${Number(hitData.page || 1) >= Number(hitData.pages || 1) ? 'disabled' : ''}>下一页</button>
+              <span class="spacer"></span>
+              <button class="btn btn-ghost" type="button" id="safetyHitsClear">${UI.icon('trash', 15)}清理 7 天前</button>
+            </div>
           </div>
         </div>
       </div>`;
     mountIcons(box);
+    $$('[data-word-toggle]', box).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.dataset.wordToggle);
+        const enabled = Number(btn.dataset.enabled);
+        btn.disabled = true;
+        try {
+          await api('adminWordToggle', { id, enabled });
+          UI.toast(enabled === 1 ? '规则已启用' : '规则已停用', 'success');
+          loadView('words');
+        } catch (err) {
+          btn.disabled = false;
+          UI.toast(err.message || '操作失败', 'error');
+        }
+      });
+    });
+    $('#hitsScene').addEventListener('change', (event) => {
+      state.hits.scene = event.target.value;
+      state.hits.page = 1;
+      loadView('words');
+    });
+    $('#hitsSource').addEventListener('change', (event) => {
+      state.hits.source = event.target.value;
+      state.hits.page = 1;
+      loadView('words');
+    });
+    $('#hitsPrev').addEventListener('click', () => {
+      if (state.hits.page > 1) {
+        state.hits.page -= 1;
+        loadView('words');
+      }
+    });
+    $('#hitsNext').addEventListener('click', () => {
+      state.hits.page += 1;
+      loadView('words');
+    });
+    $('#hitsExport').addEventListener('click', async () => {
+      try {
+        const data = await api('adminExportSafetyHits', { scene: state.hits.scene, source: state.hits.source });
+        const blob = new Blob([data.content || '{}'], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = data.filename || 'safety-hits.json';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        UI.toast(`已导出 ${Number(data.count || 0)} 条命中记录`, 'success');
+      } catch (err) {
+        UI.toast(err.message || '导出失败', 'error');
+      }
+    });
     const remoteProvider = $('#safetyRemoteProvider');
     const remoteUrl = $('#safetyRemoteUrl');
     const toggleRemoteUrl = () => { remoteUrl.disabled = remoteProvider.value !== 'custom'; };

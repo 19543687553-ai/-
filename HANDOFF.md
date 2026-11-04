@@ -1,7 +1,7 @@
 # 心屿 · AI 情感陪伴机器人 — 交接文档
 
 > 面向下一个接手本项目的 AI / 工程师。请先完整读完本文件，再动代码。
-> 最后更新：2026-11-04 · 版本：v2.3.0
+> 最后更新：2026-11-05 · 版本：v2.4.0
 
 ---
 
@@ -21,8 +21,8 @@
 
 ## 1. 当前状态与交付物
 
-- 版本：`v2.3.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名三处需一致）
-- 安装包：`/workspace/AI 情感陪伴-v2.3.0.zip`（**不含** `PHP/data/`）
+- 版本：`v2.4.0`（`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名三处需一致）
+- 安装包：`/workspace/AI 情感陪伴-v2.4.0.zip`（**不含** `PHP/data/`）
 - 默认账号：
   - 管理员：`zrl / 201354`（首次建库时写入，可用环境变量覆盖）
   - 体验用户：`demo / demo123`（昵称「晚晚」，有 12 条种子对话与 14 天情绪记录）
@@ -30,7 +30,7 @@
   - 另一用户：`chen / demo123`
 - 模型：默认 DeepSeek 预设，但**未配置 Key**，因此默认走离线陪伴模板。真实对话需在后台「模型配置」填 Key。
 
-功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板**、**全站维护页（自定义原因与预计恢复时间，登录/注册/聊天实时拦截）**、**安全词库归一化匹配（空格/标点/零宽字符规避也会拦截，覆盖聊天/注册/资料/签到/反馈）**、**后台安全词拦截测试器**、**风险消息复核队列（仪表盘计数、消息筛选、命中标记与一键复核）**、**v2.0 全新运营控制台（问候 Hero、快捷入口、安全态势、风险分类与最新命中）**、**Ctrl+K 命令面板**、**公告定时发布（开始展示/自动下线）**、**数据库体检（过期会话清理 / 限流表清理 / quick_check / PRAGMA optimize）**、**登录设备管理（查看设备 / 单设备下线 / 退出其它设备）**、**个人数据副本导出（JSON）**、**远程敏感词接口（免注册 / 免 Key，命中仅复核）**、**远程词库一键导入与清空（仅删除远程来源，保留手动规则）**、**旧版安全词表自动补列（source / updated_at）**、**安全词批量导入 / JSON 导出**、**命中记录与近 7 天统计（按场景、来源、动作）** —— 均已实现，后端冒烟与浏览器验证通过。
+功能完成度：登录注册、**七套主题**、情绪引擎、主动说话、**九种手势互动**、聊天记录、回忆/轨迹、后台 13 个模块、秒级封禁与前端封禁弹窗、模型配置与拉取模型、SSE 流式对话（打字机）、语音朗读开关、**十四种人格预设（带分类筛选，同时影响系统提示词与离线降级回复）**、**每日心情签到**、**聊天搜索与 Markdown 导出**、**成就徽章**、**回复节奏偏好（简短/适中/深入，真正进入提示词）**、**情绪周报**、**每日日志（她每天夜里写一篇，可手动写今天的）**、**浏览器通知与主动消息提醒**、**思考中状态**、**维护公告文案 / 全局与单用户暂停模型回复 / 封禁原因模板**、**全站维护页（自定义原因与预计恢复时间，登录/注册/聊天实时拦截）**、**安全词库归一化匹配（空格/标点/零宽字符规避也会拦截，覆盖聊天/注册/资料/签到/反馈）**、**后台安全词拦截测试器**、**风险消息复核队列（仪表盘计数、消息筛选、命中标记与一键复核）**、**v2.0 全新运营控制台（问候 Hero、快捷入口、安全态势、风险分类与最新命中）**、**Ctrl+K 命令面板**、**公告定时发布（开始展示/自动下线）**、**数据库体检（过期会话清理 / 限流表清理 / quick_check / PRAGMA optimize）**、**登录设备管理（查看设备 / 单设备下线 / 退出其它设备）**、**个人数据副本导出（JSON）**、**远程敏感词接口（免注册 / 免 Key，命中仅复核）**、**远程词库一键导入与清空（仅删除远程来源，保留手动规则）**、**旧版安全词表自动补列（source / updated_at）**、**安全词批量导入 / JSON 导出**、**命中记录与近 7 天统计（按场景、来源、动作）**、**规则启用/停用开关（旧表自动补 enabled）**、**命中记录场景/来源筛选、分页与导出** —— 均已实现，后端冒烟与浏览器验证通过。
 
 ---
 
@@ -102,7 +102,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 | `journals` | 每日日志（user_id + day 唯一，content/mood/meta JSON/updated_at） |
 | `feedbacks` | 用户反馈与后台回复 |
 | `announcements` | 公告（级别、启用、过期时间） |
-| `sensitive_words` | 敏感词与处置动作（`source` 区分手动/远程） |
+| `sensitive_words` | 敏感词与处置动作（`source` 区分手动/远程，`enabled` 控制启停） |
 | `safety_hits` | 安全词命中记录（用户、场景、词条、分类、动作、来源、时间） |
 | `audit_logs` | 后台操作审计（含 `model.list` 拉取记录） |
 | `rate_limits` | 接口限流计数 |
@@ -121,7 +121,7 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 `chat`、`gesture`、`poll`、`history`、`markRead`、`insights`、`checkin`、`checkinToday`、`searchMessages`、`exportChat`、`pinMessage`、`feedbackCreate`、`feedbackList`、`journals`、`journalToday`
 
 ### 后台
-`adminLogin`、`adminLogout`、`adminMe`、`adminStats`、`adminUsers`、`adminUserDetail`、`adminUpdateUser`、`adminBanUser`、`adminUnbanUser`、`adminResetPassword`、`adminDeleteUser`、`adminConversations`、`adminMessages`、`adminDeleteMessage`、`adminClearMessageFlag`、`adminPinMessage`、`adminSendMessage`、`adminMoodAnalytics`、`adminSettings`、`adminSaveSettings`、`adminModelSave`、`adminModelTest`、`adminModelList`、`adminAnnouncements`、`adminAnnouncementSave`、`adminAnnouncementDelete`、`adminWords`、`adminWordSave`、`adminWordDelete`、`adminWordBulkImport`、`adminWordExport`、`adminSafetyHits`、`adminClearSafetyHits`、`adminTestSafety`、`adminSaveSafetyRemote`、`adminTestSafetyRemote`、`adminImportRemoteWords`、`adminClearRemoteWords`、`adminFeedbacks`、`adminFeedbackReply`、`adminAdmins`、`adminAdminSave`、`adminAdminDelete`、`adminAuditLogs`、`adminBroadcast`、`adminBackup`、`adminExportUsers`、`adminSystemInfo`
+`adminLogin`、`adminLogout`、`adminMe`、`adminStats`、`adminUsers`、`adminUserDetail`、`adminUpdateUser`、`adminBanUser`、`adminUnbanUser`、`adminResetPassword`、`adminDeleteUser`、`adminConversations`、`adminMessages`、`adminDeleteMessage`、`adminClearMessageFlag`、`adminPinMessage`、`adminSendMessage`、`adminMoodAnalytics`、`adminSettings`、`adminSaveSettings`、`adminModelSave`、`adminModelTest`、`adminModelList`、`adminAnnouncements`、`adminAnnouncementSave`、`adminAnnouncementDelete`、`adminWords`、`adminWordSave`、`adminWordDelete`、`adminWordBulkImport`、`adminWordExport`、`adminWordToggle`、`adminSafetyHits`、`adminClearSafetyHits`、`adminExportSafetyHits`、`adminTestSafety`、`adminSaveSafetyRemote`、`adminTestSafetyRemote`、`adminImportRemoteWords`、`adminClearRemoteWords`、`adminFeedbacks`、`adminFeedbackReply`、`adminAdmins`、`adminAdminSave`、`adminAdminDelete`、`adminAuditLogs`、`adminBroadcast`、`adminBackup`、`adminExportUsers`、`adminSystemInfo`
 
 几个容易记错的返回结构：
 
@@ -150,6 +150,8 @@ PHP/api.php   ── switch($action) 单入口路由，try/catch 统一 JSON 错
 - `adminWordExport` 返回 `{filename, count, content}`，`content` 为 JSON 字符串（含词条、动作、分类、来源、创建时间）
 - `adminSafetyHits` 参数 `page/scene/source`，返回 `{items,total,page,pages,summary,today/week/blocked/remote/total,top,scenes,trend}`
 - `adminClearSafetyHits` 参数 `days`（默认 7，`0` 表示全部），返回 `{deleted}`
+- `adminWordToggle` 参数 `id/enabled(0|1)`，返回 `{enabled}`；停用规则不参与匹配，但保留在列表
+- `adminExportSafetyHits` 参数 `scene/source`，最多 5000 条，返回 `{filename,count,content}`
 
 ### 封禁接口约定
 
@@ -322,6 +324,12 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 - 「命中记录」面板展示今日/近 7 天/拦截/远程/累计计数、Top 8 词条与最近 20 条记录；「清理 7 天前」调用 `adminClearSafetyHits`，最近记录保留。
 - 场景名来自 `lumi_assert_safe()` 的 `$what`（用户名/昵称/陪伴者名字/人格设定/简介/签到备注/反馈内容）或聊天固定为「聊天」。
 
+**规则启停与命中运营（v2.4.0）**：
+- `sensitive_words.enabled` 默认 1；`lumi_check_safety()` 只加载 `enabled=1` 的规则，停用规则不参与匹配但保留历史与来源。
+- 旧库通过 `PRAGMA table_info(sensitive_words)` 自动补 `enabled INTEGER DEFAULT 1`，旧规则默认启用。
+- `adminWordToggle` 支持 `id/enabled` 启停；后台规则表新增「状态」列与启停按钮，审计记录 `word.toggle`。
+- 命中记录面板支持场景/来源筛选、20 条分页与「导出命中」（`adminExportSafetyHits`，最多 5000 条，审计 `safety.export_hits`）。
+
 ---
 
 ## 8. 踩过的坑（务必不要回归）
@@ -369,7 +377,8 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
 | 旧库安全词页报 `no such column: source` | 旧表无 `source/updated_at` | `lumi_migrate_db()` 自动检测并 `ALTER TABLE` 补列 |
 | 远程词库导入后无法区分手动词 | 导入与手动写入同一张表 | `sensitive_words.source` 标记 `manual` / `remote`，清空只删远程 |
 | 命中记录面板一直为空 | 只有 `flagged=true` 才写 `safety_hits`，后台手动测试不记录 | 用真实聊天/资料/签到触发复核词后复查；`adminTestSafety` 仅用于规则调试 |
-| 后台新增面板看不到 | 浏览器缓存旧的 `admin.js` | 静态资源查询串随版本更新（v2.3.0），必要时硬刷新 |
+| 后台新增面板看不到 | 浏览器缓存旧的 `admin.js` | 静态资源查询串随版本更新（v2.4.0），必要时硬刷新 |
+| 规则停用后仍命中 | 旧库 `enabled` 未迁移 / 直接改了表未刷新缓存 | 启动后确认 `PRAGMA table_info(sensitive_words)` 有 `enabled`；`adminWordToggle` 返回 `{enabled}` |
 
 ---
 
@@ -447,6 +456,12 @@ hash 路由（`#dashboard` 等 13 个视图），`switchView` / `loadView` / 各
    - 真实聊天命中复核词后 `adminSafetyHits` 的 `summary.week/today` 与 `items` 增加，`scene=聊天`、`source=local`；命中拦截词返回 422 且 `summary.blocked` 增加；
    - `adminClearSafetyHits` 传 `days=0` 清空全部、`days=7` 只清旧记录；
    - 浏览器：安全词库页「批量导入 / 导出」「命中记录」面板渲染，导出点击出现成功提示，控制台 0 报错。
+20. v2.4.0 新增回归：
+   - `adminWords` 每条含 `enabled`；旧库启动后 `PRAGMA table_info(sensitive_words)` 能看到 `enabled`；
+   - `adminWordToggle` 停用后用 `adminTestSafety` 不再命中，启用后恢复命中；重复相同状态返回 404；
+   - `adminSafetyHits` 传 `scene/source` 过滤后 `total` 正确，`page` 超界由前端回退；
+   - `adminExportSafetyHits` 过滤导出 `count/content` 正确，`adminClearSafetyHits` 可清空；
+   - 浏览器：规则表「状态」列、命中场景/来源筛选、分页、导出命中按钮均正常。
 
 ---
 
@@ -459,7 +474,7 @@ unzip -t "AI 情感陪伴-v<版本>.zip"
 ```
 
 - 不打包 `PHP/data/`（首次部署自动生成）。
-- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v2.3.0）。
+- 升版本时同步：`PHP/config.php` 的 `LUMI_VERSION`、`admin.html` 页脚、压缩包文件名（当前 v2.4.0）。
 - 打包后记录 SHA-256，方便校验。
 
 ---

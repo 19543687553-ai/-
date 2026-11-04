@@ -105,8 +105,10 @@ try {
         case 'adminWordDelete':        lumi_action_admin_word_delete(); break;
         case 'adminWordBulkImport':    lumi_action_admin_word_bulk_import(); break;
         case 'adminWordExport':        lumi_action_admin_word_export(); break;
+        case 'adminWordToggle':        lumi_action_admin_word_toggle(); break;
         case 'adminSafetyHits':        lumi_action_admin_safety_hits(); break;
         case 'adminClearSafetyHits':   lumi_action_admin_clear_safety_hits(); break;
+        case 'adminExportSafetyHits':  lumi_action_admin_export_safety_hits(); break;
         case 'adminTestSafety':        lumi_action_admin_test_safety(); break;
         case 'adminSaveSafetyRemote':  lumi_action_admin_save_safety_remote(); break;
         case 'adminTestSafetyRemote':  lumi_action_admin_test_safety_remote(); break;
@@ -736,7 +738,7 @@ function lumi_check_safety(string $text): array
     if (!(int)lumi_setting('safety_enabled', '1')) {
         return ['allowed' => true, 'flagged' => false, 'matched' => ''];
     }
-    $rows = lumi_db()->query("SELECT word, action, category FROM sensitive_words ORDER BY LENGTH(word) DESC")->fetchAll();
+    $rows = lumi_db()->query("SELECT word, action, category FROM sensitive_words WHERE enabled=1 ORDER BY LENGTH(word) DESC")->fetchAll();
     $haystack = lumi_safety_normalize($text);
     foreach ($rows as $row) {
         $word = (string)$row['word'];
@@ -2567,6 +2569,7 @@ function lumi_action_admin_words(): void
         if (empty($row['source'])) $row['source'] = 'manual';
         $row['updated_at'] = (int)($row['updated_at'] ?? 0);
         $row['created_at'] = (int)($row['created_at'] ?? 0);
+        $row['enabled'] = isset($row['enabled']) ? (int)$row['enabled'] : 1;
     }
     unset($row);
     lumi_ok([
@@ -2706,6 +2709,18 @@ function lumi_action_admin_word_delete(): void
     lumi_ok([], '已删除');
 }
 
+function lumi_action_admin_word_toggle(): void
+{
+    $admin = lumi_require_admin(['superadmin', 'admin', 'moderator']);
+    $id = (int)lumi_param('id', 0);
+    $enabled = (int)lumi_param('enabled', 1) === 1 ? 1 : 0;
+    $st = lumi_db()->prepare("UPDATE sensitive_words SET enabled=?, updated_at=? WHERE id=?");
+    $st->execute([$enabled, time(), $id]);
+    if ($st->rowCount() < 1) lumi_err('规则不存在或状态未变化', 404);
+    lumi_audit($admin, 'word.toggle', 'word', (string)$id, $enabled === 1 ? '启用规则' : '停用规则');
+    lumi_ok(['enabled' => $enabled], $enabled === 1 ? '规则已启用' : '规则已停用');
+}
+
 function lumi_action_admin_word_bulk_import(): void
 {
     $admin = lumi_require_admin(['superadmin', 'admin', 'moderator']);
@@ -2835,6 +2850,44 @@ function lumi_action_admin_safety_hits(): void
         'top' => $top,
         'scenes' => $scenes,
         'trend' => $trend,
+    ]);
+}
+
+function lumi_action_admin_export_safety_hits(): void
+{
+    $admin = lumi_require_admin();
+    $scene = trim((string)lumi_param('scene', ''));
+    $source = (string)lumi_param('source', '');
+    $where = '1=1';
+    $params = [];
+    if ($scene !== '') {
+        $where .= ' AND scene=?';
+        $params[] = $scene;
+    }
+    if (in_array($source, ['local', 'remote'], true)) {
+        $where .= ' AND source=?';
+        $params[] = $source;
+    }
+    $st = lumi_db()->prepare("SELECT id, user_id, scene, word, category, action, source, created_at FROM safety_hits WHERE " . $where . " ORDER BY id DESC LIMIT 5000");
+    $st->execute($params);
+    $rows = $st->fetchAll();
+    foreach ($rows as &$row) {
+        $row['id'] = (int)$row['id'];
+        $row['user_id'] = (int)$row['user_id'];
+        $row['created_at'] = (int)$row['created_at'];
+    }
+    unset($row);
+    $content = json_encode([
+        'exported_at' => lumi_now_text(),
+        'filters' => ['scene' => $scene, 'source' => $source],
+        'count' => count($rows),
+        'items' => $rows,
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    lumi_audit($admin, 'safety.export_hits', 'safety', 'hits', '导出命中记录 ' . count($rows) . ' 条');
+    lumi_ok([
+        'filename' => 'safety-hits-' . date('Ymd-His') . '.json',
+        'count' => count($rows),
+        'content' => $content,
     ]);
 }
 
